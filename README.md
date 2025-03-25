@@ -19,6 +19,7 @@ Python 3.12 environment detailed in environment.yml file. Pypangraph installed v
 `stats_utils.py` = functions for statistical analyses used in other scripts
 `plot_utils.py` = functions for visualizing data. Useful to ensure same color schemes, heatmap styles, etc across plots.
 
+```
 .
 ├── scripts/
 │   ├── plot_utils.py
@@ -52,4 +53,4 @@ Python 3.12 environment detailed in environment.yml file. Pypangraph installed v
 ├── config.py
 ├── environment.yml
 └── .gitignore
-
+```
