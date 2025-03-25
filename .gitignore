@@ -1,0 +1,7 @@
+.DS_Store
+./data/Single_vOTUs
+./data/Pairs_vOTUs
+./data/uhgv_metadata.tsv.gzdata/Pairs_vOTUs/
+data/Single_vOTUs/
+uhgv_metadata.tsv.gz
+data/Pairs_vOTUs/
