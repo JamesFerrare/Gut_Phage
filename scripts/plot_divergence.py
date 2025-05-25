@@ -61,102 +61,97 @@ def calculate_divergence(votu, n_pairs=None):#, n_genomes_subsample=6):
     #f = os.path.join(file_directory, filename)
     #minimap_path_votu = os.path.join(minimap_path, votu)
     #minimap_path_votu = minimap_path % votu
-    minimap_path_votu = glob.glob('%sSingle_vOTUs/Pangraphs/*%s*.json' % (config.data_directory, votu))[0]
+    
+
+    minimap_path_votu_all = glob.glob('%sSingle_vOTUs/Pangraphs/*%s*.json' % (config.data_directory, votu))
+
+    if len(minimap_path_votu_all) > 0:
+
+        minimap_path_votu = minimap_path_votu_all[0]
+
+        # checking if it is a file
+        if os.path.isfile(minimap_path_votu):
+
+            sys.stderr.write("Calculating divergences for %s....\n" % votu)
+
+            pangraph_data = data_utils.load_pangraph_data(minimap_path_votu)
+            pangraph_genome_names = data_utils.get_pangraph_genome_names(pangraph_data)
+            pangraph_genome_names.sort()
+
+            genome_pair_all = list(combinations(pangraph_genome_names,2))
+
+            # check if fourfold status is detemrined
+            syn_sites_path = syn_sites_path_template % votu
+            if os.path.exists(syn_sites_path):
+                syn_sites_dict = pickle.load(open(syn_sites_path, "rb"))
+            else:
+                syn_sites_dict = None
 
 
-    # checking if it is a file
-    if os.path.isfile(minimap_path_votu):
+            # make it a numpy array
+            if syn_sites_dict != None:
+                for block_i_id, block_i_id_dict in syn_sites_dict.items():
 
-        pangraph_data = data_utils.load_pangraph_data(minimap_path_votu)
-        pangraph_genome_names = data_utils.get_pangraph_genome_names(pangraph_data)
-        pangraph_genome_names.sort()
+                    if block_i_id == 'data':
+                        continue
+                                # only consider blocks 
+                    if syn_sites_dict[block_i_id]['keep_block'] == True:
 
-        genome_pair_all = list(combinations(pangraph_genome_names,2))
+                        genome_all = list(block_i_id_dict['data']['genomes'].keys())
+                        for g in genome_all:
 
-        #votu = filename.split('/')[-1].split('.')[0].split('_')[0]
-
-        print(votu)
-        
-        # check if fourfold status is detemrined
-        #syn_sites_path = '%s%s.pickle' % (syn_sites_directory, votu)
-        syn_sites_path = syn_sites_path_template % votu
-        #print(syn_sites_path)
-        if os.path.exists(syn_sites_path):
-            syn_sites_dict = pickle.load(open(syn_sites_path, "rb"))
-        else:
-            syn_sites_dict = None
+                            syn_sites_dict[block_i_id]['data']['genomes'][g]['site_block_position'] = numpy.asarray(block_i_id_dict['data']['genomes'][g]['site_block_position'])
+                            syn_sites_dict[block_i_id]['data']['genomes'][g]['site_syn_status'] = numpy.asarray(block_i_id_dict['data']['genomes'][g]['site_syn_status'])
 
 
-        # make it a numpy array
-        if syn_sites_dict != None:
-            for block_i_id, block_i_id_dict in syn_sites_dict.items():
+            div_dict_path = div_dict_path_template % votu
+            div_dict = {}
 
-                if block_i_id == 'data':
+            if n_pairs != None:
+                random.shuffle(genome_pair_all)
+                genome_pair_all = genome_pair_all[:n_pairs]
+                            
+            for genome_pair_idx, genome_pair in enumerate(genome_pair_all):
+
+                #finished = 100*(genome_pair_idx/n_genome_pair)
+
+                if genome_pair_idx % 5000 == 0:
+                    print(genome_pair_idx)
+                
+                #if divmod(finished, 10) == (updates, 0):
+                #    updates += 1
+                #    #if int(finished) == 0:
+                #    #    continue
+                #    sys.stderr.write(str(int(finished)) + "%" + " done...\n")
+
+                bins, binned_divergence, total_divergence, cumulative_n_nonsyn, cumulative_n_syn, cumulative_block_len_nonsyn, cumulative_block_len_syn, len_fraction_shared_blocks, len_fraction_shared_blocks_union = data_utils.calculate_divergence_across_pangraph_blocks(genome_pair[0], genome_pair[1], pangraph_data, syn_sites_dict=syn_sites_dict, calculate_binned_divergence=False)
+                # ignore    
+                if total_divergence == None:
                     continue
-                            # only consider blocks 
-                if syn_sites_dict[block_i_id]['keep_block'] == True:
 
-                    genome_all = list(block_i_id_dict['data']['genomes'].keys())
-                    for g in genome_all:
+                #print(cumulative_n_nonsyn, cumulative_n_syn, cumulative_block_len_nonsyn, cumulative_block_len_syn)
 
-                        syn_sites_dict[block_i_id]['data']['genomes'][g]['site_block_position'] = numpy.asarray(block_i_id_dict['data']['genomes'][g]['site_block_position'])
-                        syn_sites_dict[block_i_id]['data']['genomes'][g]['site_syn_status'] = numpy.asarray(block_i_id_dict['data']['genomes'][g]['site_syn_status'])
+                #dn = (cumulative_n_nonsyn + 1)/(cumulative_block_len_nonsyn + 1)
+                #ds = (cumulative_n_syn + 1)/(cumulative_block_len_syn + 1)
 
+                div_dict[genome_pair] = {}
+                #div_dict[genome_pair]['bins'] = bins.tolist()
+                #div_dict[genome_pair]['binned_divergence'] = binned_divergence.tolist()
+                div_dict[genome_pair]['total_divergence'] = total_divergence
+                div_dict[genome_pair]['len_fraction_shared_blocks'] = len_fraction_shared_blocks
+                div_dict[genome_pair]['len_fraction_shared_blocks_union'] = len_fraction_shared_blocks_union
 
-        #print(syn_sites_dict.keys())
-
-        div_dict_path = div_dict_path_template % votu
-        div_dict = {}
-        #n_genome_pair = len(genome_pair_all)
-        #updates = 0
-
-        if n_pairs != None:
-            random.shuffle(genome_pair_all)
-            genome_pair_all = genome_pair_all[:n_pairs]
-            
-            #genome_pair_subsample_idx_all = range(0, len(genome_pair_all), n_pairs)
-        
-        for genome_pair_idx, genome_pair in enumerate(genome_pair_all):
-
-            #finished = 100*(genome_pair_idx/n_genome_pair)
-
-            if genome_pair_idx % 5000 == 0:
-                print(genome_pair_idx)
-            
-            #if divmod(finished, 10) == (updates, 0):
-            #    updates += 1
-            #    #if int(finished) == 0:
-            #    #    continue
-            #    sys.stderr.write(str(int(finished)) + "%" + " done...\n")
-
-            bins, binned_divergence, total_divergence, cumulative_n_nonsyn, cumulative_n_syn, cumulative_block_len_nonsyn, cumulative_block_len_syn, len_fraction_shared_blocks, len_fraction_shared_blocks_union = data_utils.calculate_divergence_across_pangraph_blocks(genome_pair[0], genome_pair[1], pangraph_data, syn_sites_dict=syn_sites_dict, calculate_binned_divergence=False)
-            # ignore    
-            if total_divergence == None:
-                continue
-
-            #print(cumulative_n_nonsyn, cumulative_n_syn, cumulative_block_len_nonsyn, cumulative_block_len_syn)
-
-            #dn = (cumulative_n_nonsyn + 1)/(cumulative_block_len_nonsyn + 1)
-            #ds = (cumulative_n_syn + 1)/(cumulative_block_len_syn + 1)
-
-            div_dict[genome_pair] = {}
-            #div_dict[genome_pair]['bins'] = bins.tolist()
-            #div_dict[genome_pair]['binned_divergence'] = binned_divergence.tolist()
-            div_dict[genome_pair]['total_divergence'] = total_divergence
-            div_dict[genome_pair]['len_fraction_shared_blocks'] = len_fraction_shared_blocks
-            div_dict[genome_pair]['len_fraction_shared_blocks_union'] = len_fraction_shared_blocks_union
-
-            div_dict[genome_pair]['cumulative_n_nonsyn'] = cumulative_n_nonsyn
-            div_dict[genome_pair]['cumulative_n_syn'] = cumulative_n_syn
-            div_dict[genome_pair]['cumulative_block_len_nonsyn'] = cumulative_block_len_nonsyn
-            div_dict[genome_pair]['cumulative_block_len_syn'] = cumulative_block_len_syn
+                div_dict[genome_pair]['cumulative_n_nonsyn'] = cumulative_n_nonsyn
+                div_dict[genome_pair]['cumulative_n_syn'] = cumulative_n_syn
+                div_dict[genome_pair]['cumulative_block_len_nonsyn'] = cumulative_block_len_nonsyn
+                div_dict[genome_pair]['cumulative_block_len_syn'] = cumulative_block_len_syn
 
 
 
-        sys.stderr.write("Saving dictionary...\n")
-        with open(div_dict_path, 'wb') as handle:
-            pickle.dump(div_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        sys.stderr.write("Done!\n")
+            sys.stderr.write("Saving dictionary...\n")
+            with open(div_dict_path, 'wb') as handle:
+                pickle.dump(div_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            sys.stderr.write("Done!\n")
 
 
 
@@ -183,8 +178,6 @@ def plot_divergence_vs_shared_blocks(votu, syn_divergence=True, min_n_muts=30, m
     #votu_all.sort()
 
     #for votu in votu_all:
-
-    print(votu)
 
     div_dict_path = '%sdivergence_dict_all/%s.pickle' % (config.data_directory, votu)
     div_dict = pickle.load(open(div_dict_path, "rb"))
@@ -497,7 +490,6 @@ def plot_ds_vs_dnds(pseudocount=0, min_n_muts=10, min_n_sites=1e3):
 
 def plot_ds_vs_dnds_dist_axis(votu, pseudocount=0, min_n_muts=50, min_n_sites=1e3, n_bins=30, poisson_thinning=True):
 
-
     div_dict_path = '%sdivergence_dict_all/%s.pickle' % (config.data_directory, votu)
     div_dict = pickle.load(open(div_dict_path, "rb"))
     
@@ -529,9 +521,6 @@ def plot_ds_vs_dnds_dist_axis(votu, pseudocount=0, min_n_muts=50, min_n_sites=1e
         # at least min_n_sites possible sites
         if (cumulative_block_len_syn < min_n_sites) or (cumulative_block_len_nonsyn < min_n_sites):
             continue
-
-        #dn = (cumulative_n_nonsyn+pseudocount)/(cumulative_block_len_nonsyn+pseudocount)
-        #ds = (cumulative_n_syn+pseudocount)/(cumulative_block_len_syn+pseudocount)
 
         cumulative_n_syn_all.append(cumulative_n_syn)
         cumulative_n_nonsyn_all.append(cumulative_n_nonsyn)
@@ -597,12 +586,9 @@ def plot_ds_vs_dnds_dist_axis(votu, pseudocount=0, min_n_muts=50, min_n_sites=1e
     same_continent_diff_country_scatter = same_continent_diff_country[to_plot_idx]
     same_continent_same_country_scatter = same_continent_same_country[to_plot_idx]
 
-
-
-
-    scatter_axis.scatter(ds_1[~same_continent_idx_scatter], dnds_all_scatter[~same_continent_idx_scatter], s=8, c='#FF6347', alpha=0.3, label='Diff. continent')
-    scatter_axis.scatter(ds_1[same_continent_diff_country_scatter], dnds_all_scatter[same_continent_diff_country_scatter], s=8, c='#FFA500', alpha=0.3, label='Same continent, diff. country')
-    scatter_axis.scatter(ds_1[same_continent_same_country_scatter], dnds_all_scatter[same_continent_same_country_scatter], s=8, c='#87CEEB', alpha=0.3, label='Same country')
+    scatter_axis.scatter(ds_1[~same_continent_idx_scatter], dnds_all_scatter[~same_continent_idx_scatter], s=8, c='#FF6347', alpha=0.05, label='Diff. continent')
+    scatter_axis.scatter(ds_1[same_continent_diff_country_scatter], dnds_all_scatter[same_continent_diff_country_scatter], s=8, c='#FFA500', alpha=0.05, label='Same continent, diff. country')
+    scatter_axis.scatter(ds_1[same_continent_same_country_scatter], dnds_all_scatter[same_continent_same_country_scatter], s=8, c='#87CEEB', alpha=0.05, label='Same country')
     
 
     ds_bins_log10 = numpy.logspace(min(numpy.log10(ds_all)),max(numpy.log10(ds_all)), n_bins, base=10)
@@ -626,7 +612,6 @@ def plot_ds_vs_dnds_dist_axis(votu, pseudocount=0, min_n_muts=50, min_n_sites=1e
 
 
     #scatter_axis_xticks = scatter_axis.get_xticks()
-    #print(scatter_axis_xticks)
     scatter_axis.axhline(y=1, c='k', ls=':', lw=1, label='Neutral')
     dnds_hist_axis.axhline(y=1, c='k', ls=':', lw=1)
 
@@ -1225,7 +1210,8 @@ if __name__ == "__main__":
 
 
     votu_all = data_utils.get_single_votus()
-    start_idx = votu_all.index('vOTU-007481')
+    start_idx = votu_all.index('vOTU-000005') + 1 
+    votu_all = votu_all[start_idx:]
 
     for votu in votu_all:
 
@@ -1234,7 +1220,10 @@ if __name__ == "__main__":
 
         #data_utils.build_votu_fasta(votu, build_votu_fasta=True)
         #data_utils.make_syn_sites_votu_dict_from_pangraph(votu)
-        calculate_divergence(votu)
+        #calculate_divergence(votu)
+
+
+    plot_ds_vs_dnds_dist_axis('vOTU-000001', poisson_thinning=True, min_n_muts=50, min_n_sites=1e3)
 
         
 

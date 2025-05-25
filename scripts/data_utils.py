@@ -1385,18 +1385,12 @@ def make_syn_sites_votu_dict_from_pangraph(votu):
     fasta_genome_dict = {x[0]:x[1] for x in fasta_all_genomes}
 
     # get fasta files for the votu
-    #pangraph_file_path = '%scomplete_minimap2/%s_complete_polished.json' % (config.data_directory, votu)
-
     pangraph_file_path_all = glob.glob('%sSingle_vOTUs/Pangraphs/*%s*.json' % (config.data_directory, votu))
 
     if len(pangraph_file_path_all) == 0:
         return None
     else:
         pangraph_file_path = pangraph_file_path_all[0]
-
-    #fasta_all_genomes = classFASTA(file_path).readFASTA()
-    #fasta_genome_dict = {x[0]:x[1] for x in fasta_all_genomes}
-    #target_genome_all = list(fasta_genome_dict.keys())
 
     pangraph_votu = load_pangraph_data(pangraph_file_path)
     #pan = pypangraph.Pangraph.from_json(pangraph_file_path)
@@ -1559,11 +1553,6 @@ def make_syn_sites_votu_dict_from_pangraph(votu):
             # the positions of each fasta position in the current block
             sites_position_in_block_all = [loc.find_position(strain=genome_name_i_j, pos=h)[1] for h in sites_position_in_fasta_all]
             # the positions and allele of each mutation in the current block that are in CDS regions
-            #block_i_mutate_genome_j_in_cds = [x for x in block_i_mutate_genome_j if x[0] in sites_position_in_block_all ]
-
-            # no mutations in CDS regions! skip.
-            #if len(block_i_mutate_genome_j_in_cds) == 0:
-            #    continue
 
             # no CDS in the block! skip.
             if len(sites_position_in_block_all) == 0:
@@ -1601,7 +1590,6 @@ def make_syn_sites_votu_dict_from_pangraph(votu):
 def computed_poisson_thinning(diffs, opportunities):
     # apply this to calculation of all dN/dS
     # specifically when calculating dS
-    print(diffs)
     thinned_diffs_1 = numpy.random.binomial(diffs, 0.5)
     thinned_diffs_2 = diffs - thinned_diffs_1
     d1 = thinned_diffs_1 / (opportunities.astype(float) / 2)
@@ -1609,3 +1597,63 @@ def computed_poisson_thinning(diffs, opportunities):
     return d1, d2
 
 
+
+
+
+def build_aligned_fasta_to_unaligned_fasta_position_dict(votu):
+
+    '''
+    Maps positions in the aligned FASTA sequence to positions in the unaligned FASTA
+    and provides 4D annotation status for each genome in a given OTU
+    '''
+
+    unaligned_fasta_path = '%suhgv_mgv_otu_fna/%s.fna' % (config.data_directory, votu) 
+    unaligned_fasta_nested_list = classFASTA(unaligned_fasta_path).readFASTA()
+
+    aligned_fasta_glob = glob.glob('%sSingle_vOTUs/Core_Alignments/*%s*.fna' % (config.data_directory, votu))
+    if len(aligned_fasta_glob) > 0:
+        aligned_fasta_path = aligned_fasta_glob[0]
+        aligned_fasta_nested_list = classFASTA(aligned_fasta_path).readFASTA()
+        
+        # build dictionray
+    annotation_dict = pickle.load(open(annotation_dict_path, "rb"))
+
+    unaligned_genome_names = [s[0] for s in unaligned_fasta_nested_list]
+    aligned_genome_names = [s[0] for s in aligned_fasta_nested_list]
+    genomes_names_intersection = list(set(unaligned_genome_names) & set(aligned_genome_names))
+
+    fasta_dict = {}
+    for genome_name in genomes_names_intersection:
+
+        fasta_dict[genome_name] = {}
+
+        unaligned_idx = unaligned_genome_names.index(genome_name)
+        aligned_idx = aligned_genome_names.index(genome_name)
+
+        unaligned_genome = unaligned_fasta_nested_list[unaligned_idx][1]
+        aligned_genome = aligned_fasta_nested_list[aligned_idx][1]
+
+        print(len(unaligned_genome), len(aligned_genome))
+
+
+
+        
+
+
+    #print(len(aligned_genome_names), len(genomes_intersection))
+    #print(len(genomes_intersection), len(aligned_fasta_nested_list[0]))
+    
+    
+
+    return None
+
+        
+    
+
+
+
+if __name__ == "__main__":
+
+    votu = 'vOTU-000010'
+
+    build_aligned_fasta_to_unaligned_fasta_position_dict(votu)
