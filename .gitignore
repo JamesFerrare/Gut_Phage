@@ -5,3 +5,10 @@
 data/Single_vOTUs/
 uhgv_metadata.tsv.gz
 data/Pairs_vOTUs/
+data/gutsy25_all_metadata_phold.tsv.gz
+data/divergence_dict_all/
+data/syn_sites_dict_all/
+data/uhgv_mgv.fna.gz
+data/uhgv_mgv_otu_fna/
+data/annotation_dict.pickle
+data/divergence_dict_all.zip
