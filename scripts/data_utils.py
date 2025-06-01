@@ -97,6 +97,9 @@ annotation_dict_path = '%sannotation_dict.pickle' % config.data_directory
 syn_sites_dict_path = config.data_directory + 'syn_sites_dict_all/%s.pickle' 
 
 
+lifestyle_color_dict = {'both':'k', 'temperate':'#87CEEB', 'lytic':'#FF6347'}
+
+
 
 
 def read_sample_metadata():
@@ -1649,6 +1652,19 @@ def build_aligned_fasta_to_unaligned_fasta_position_dict(votu):
 
         
     
+    
+
+def make_survival_dist(data, range_, probability=True):
+
+    data = data[numpy.isfinite(data)]
+    survival_array = [sum(data>=i) for i in range_]
+    #survival_array = [sum(data>=i)/len(data) for i in range_]
+    survival_array = numpy.asarray(survival_array)
+
+    if probability == True:
+        survival_array = survival_array/len(data)
+
+    return survival_array
 
 
 

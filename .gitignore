@@ -11,4 +11,4 @@ data/syn_sites_dict_all/
 data/uhgv_mgv.fna.gz
 data/uhgv_mgv_otu_fna/
 data/annotation_dict.pickle
-analysis/ds_vs_dnds_dist_axis/
+data/divergence_dict_all.zip
