@@ -1264,6 +1264,7 @@ def syn_div_nonsyn_ratio_dip_test(min_n_muts=50, min_n_sites=1e3, min_n_pairs=50
     ax_dnds_score = plt.subplot2grid((2, 2), (1, 1), colspan=1)
 
     lifestyle_all = []
+    ds_diptest_all = []
     dnds_diptest_all = []
     votu_score_all = []
     
@@ -1302,31 +1303,76 @@ def syn_div_nonsyn_ratio_dip_test(min_n_muts=50, min_n_sites=1e3, min_n_pairs=50
 
         lifestyle_all.append(lifestyle)
         votu_score_all.append(votu_score)
+        ds_diptest_all.append(ds_diptest)
         dnds_diptest_all.append(dnds_diptest)
         
     
     lifestyle_all = numpy.asarray(lifestyle_all)
     votu_score_all = numpy.asarray(votu_score_all)
+    ds_diptest_all = numpy.asarray(ds_diptest_all)
     dnds_diptest_all = numpy.asarray(dnds_diptest_all)
     
-    dnds_diptest_temperate = dnds_diptest_all[lifestyle_all=='temperate']
-    dnds_diptest_lytic = dnds_diptest_all[lifestyle_all=='lytic']
+    dnds_diptest_temperate = ds_diptest_all[lifestyle_all=='temperate']
+    dnds_diptest_lytic = ds_diptest_all[lifestyle_all=='lytic']
+    
+    for lifestyle_i_idx, lifestyle_i in enumerate(data_utils.lifestyle_all):
+        jitter_strength = 0.1
+        lifestyle_idx = lifestyle_all==lifestyle_i
+        x_jittered = lifestyle_i_idx + numpy.random.uniform(-jitter_strength, jitter_strength, size=sum(lifestyle_idx))
+        ax_ds_lifestyle.scatter(x_jittered, ds_diptest_all[lifestyle_idx], c=data_utils.lifestyle_color_dict[lifestyle_i], alpha=0.7, s=50)
+        ax_dnds_lifestyle.scatter(x_jittered, ds_diptest_all[lifestyle_idx], c=data_utils.lifestyle_color_dict[lifestyle_i], alpha=0.7, s=50)
 
+        ds_diptest_lifestyle_i = ds_diptest_all[lifestyle_idx]
+        dnds_diptest_lifestyle_i = dnds_diptest_all[lifestyle_idx]
+                
+        ax_ds_lifestyle.errorbar(lifestyle_i_idx, numpy.mean(ds_diptest_lifestyle_i), yerr=stats.sem(ds_diptest_lifestyle_i), fmt='o', capsize=5, color='k', markersize=8)
+        ax_dnds_lifestyle.errorbar(lifestyle_i_idx, numpy.mean(dnds_diptest_lifestyle_i), yerr=stats.sem(dnds_diptest_lifestyle_i), fmt='o', capsize=5, color='k', markersize=8)
+
+    
+    
+    # scatter
+    ax_ds_score.scatter(votu_score_all, ds_diptest_all, c=data_utils.lifestyle_color_dict['lytic'], alpha=0.7, s=50)
+    ax_dnds_score.scatter(votu_score_all, dnds_diptest_all, c=data_utils.lifestyle_color_dict['lytic'], alpha=0.7, s=50)
+
+    
+    ax_ds_lifestyle.set_xticks([0,1])
+    ax_ds_lifestyle.set_xticklabels(data_utils.lifestyle_all)
+    
+    ax_dnds_lifestyle.set_xticks([0,1])
+    ax_dnds_lifestyle.set_xticklabels(data_utils.lifestyle_all)
+
+
+    ax_ds_lifestyle.set_ylabel("Hartigen's test for unimodality, " + r'$d_{S}$', fontsize=10)
+    ax_dnds_lifestyle.set_ylabel("Hartigen's test for unimodality, " + r'$d_{N}/d_{S}$', fontsize=10)
+    
+    ax_ds_score.set_xlabel("Temperate score", fontsize=10)
+    ax_dnds_score.set_xlabel("Temperate score", fontsize=10)
+
+    ax_ds_score.set_ylabel("Hartigen's test for unimodality, " + r'$d_{S}$', fontsize=10)
+    ax_dnds_score.set_ylabel("Hartigen's test for unimodality, " + r'$d_{N}/d_{S}$', fontsize=10)
+
+    #ax_ds_lifestyle
 
     print('Lytic: %3f +/- %3f' % (numpy.mean(dnds_diptest_lytic), stats.sem(dnds_diptest_lytic)))
     print('Temperate: %3f +/- %3f' % (numpy.mean(dnds_diptest_temperate), stats.sem(dnds_diptest_temperate)))
+    
+    print(stats.ttest_ind(dnds_diptest_temperate, dnds_diptest_lytic))
 
     
     slope, intercept, r, p, se = stats.linregress(votu_score_all, dnds_diptest_all)
     # significant, but weak relationship....
+    
+    fig_name = "%sdiptest_lifestyle.png" % config.analysis_directory
+    fig.savefig(fig_name, bbox_inches='tight', format='png', pad_inches = 0.3, dpi = 600)
+    plt.close()
 
 
 
 
 if __name__ == "__main__":
 
-
     votu_all = data_utils.get_single_votus()
+    syn_div_nonsyn_ratio_dip_test()
     #start_idx = votu_all.index('vOTU-000005') + 1 
     #votu_all = votu_all[start_idx:]
     
