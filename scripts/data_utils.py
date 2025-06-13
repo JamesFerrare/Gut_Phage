@@ -7,7 +7,10 @@ import json
 import sys
 import pickle
 import copy
+import glob
 import random
+from pathlib import Path
+
 
 from collections import Counter
 
@@ -33,6 +36,10 @@ random.seed(123456789)
 
 
 base_table = {'A':'T','T':'A','G':'C','C':'G'}
+
+
+votu_to_skip = ['vOTU-000015', 'vOTU-007481']
+
 
 
 # translation table 11
@@ -88,6 +95,9 @@ country_code_dict = {'RUS': 'Russia', 'MNG':'Mongolia', 'FRA':'France', 'FIN':'F
 
 annotation_dict_path = '%sannotation_dict.pickle' % config.data_directory
 syn_sites_dict_path = config.data_directory + 'syn_sites_dict_all/%s.pickle' 
+
+
+lifestyle_color_dict = {'both':'k', 'temperate':'#87CEEB', 'lytic':'#FF6347'}
 
 
 
@@ -637,16 +647,35 @@ def coarse_grain_abundances_by_taxonomy(count_array, votus, uhgv_votu_metadata_d
 
 
 
+def get_single_votus():
 
-def build_votu_fasta(votu='vOTU-000085', checkv_quality='Complete'):
+    directory = Path('%sSingle_vOTUs/Core_Alignments/' % config.data_directory)
+    files = [f.name for f in directory.iterdir() if f.is_file() and ('.fna' in f.name)]
+    votu_all = [f.split('_')[2] for f in files]
+    votu_all.sort()
+    return votu_all
+
+
+
+
+
+def build_votu_fasta(votu='vOTU-000085', checkv_quality='Complete', subset_single_votus=True):
 
     '''
     Builds a fasta file for a given vOTU
     '''
 
-    uhgv_votu_metadata_dict, uhgv_genome_metadata_dict = read_uhgv_metadata(checkv_quality=checkv_quality, checkv_quality_cumulative=True)
-    
-    target_genome_all = uhgv_votu_metadata_dict[votu]['uhgv_genome']
+    if subset_single_votus == True:
+        # get target genomes from the FASTA Jimmy processed
+        file_path = glob.glob('%sSingle_vOTUs/Core_Alignments/*%s*.fna' % (config.data_directory, votu))[0]
+        fasta_all_genomes = classFASTA(file_path).readFASTA()
+        fasta_genome_dict = {x[0]:x[1] for x in fasta_all_genomes}
+        target_genome_all = list(fasta_genome_dict.keys())
+
+    else:
+        uhgv_votu_metadata_dict, uhgv_genome_metadata_dict = read_uhgv_metadata(checkv_quality=checkv_quality, checkv_quality_cumulative=True)
+        target_genome_all = uhgv_votu_metadata_dict[votu]['uhgv_genome']
+
 
     fasta_file_path = '%suhgv_mgv_otu_fna/%s.fna' % (config.data_directory, votu) 
     fasta_file_open = open(fasta_file_path, 'w')
@@ -666,10 +695,11 @@ def build_votu_fasta(votu='vOTU-000085', checkv_quality='Complete'):
                 fasta_file_open.write('\n')
 
 
-
     fasta_file_open.close()
 
 
+
+#def build_votu_fasta(votu='vOTU-000085', checkv_quality='Complete'):
 
 
 
@@ -1071,16 +1101,6 @@ def calculate_divergence_across_pangraph_blocks(genome_1, genome_2, pangraph_dat
                 shared_site_dict_i[mutatate_2_l_pos]['genome_2'] = mutatate_2_l_allele
 
 
-            # reverse order.
-            #sequence_i_1 = copy.copy(sequence_i)
-            #sequence_i_2 = copy.copy(sequence_i)
-            #if mutatate_1[0]['strand'] == False:
-            #    sequence_i_1 = sequence_i_1[::-1]
-        
-            #if mutatate_2[0]['strand'] == False:
-            #    sequence_i_2 = sequence_i_2[::-1]
-
-
             # identify fourfold status of the site in each genome
             examine_syn_block = False
             if syn_sites_dict != None: # annotation dict exists
@@ -1201,14 +1221,6 @@ def calculate_divergence_across_pangraph_blocks(genome_1, genome_2, pangraph_dat
         binned_n_sites_nonsyn = numpy.asarray([sum((nonsyn_sites >= all_bins_syn_nonsyn[i]) & (nonsyn_sites < all_bins_syn_nonsyn[i+1])) for i in range(len(all_bins_syn_nonsyn)-1)])
 
 
-        #print(max(syn_sites), max(nonsyn_sites))
-
-        #print(cumulative_inter_block_len)
-
-        print(binned_n_mut_nonsyn/binned_n_sites_nonsyn)
-        #print(binned_n_mut_nonsyn, binned_n_sites_nonsyn)
-
-
     else:
         all_bins = None
         binned_divergence = None
@@ -1221,7 +1233,6 @@ def calculate_divergence_across_pangraph_blocks(genome_1, genome_2, pangraph_dat
         #total_divergence_nonsyn = cumulative_n_nonsyn/cumulative_block_len_nonsyn
         #total_divergence_syn = cumulative_n_syn/cumulative_block_len_syn
         
-    #else:
     if syn_sites_dict == None:
         #total_divergence_nonsyn = None
         #total_divergence_syn = None
@@ -1235,8 +1246,6 @@ def calculate_divergence_across_pangraph_blocks(genome_1, genome_2, pangraph_dat
         total_divergence = None
     else: 
         total_divergence = len(cumulative_block_position)/cumulative_inter_block_len
-
-
 
 
     return all_bins, binned_divergence, total_divergence, cumulative_n_nonsyn, cumulative_n_syn, cumulative_block_len_nonsyn, cumulative_block_len_syn, len_fraction_shared_blocks, len_fraction_shared_blocks_union
@@ -1259,41 +1268,53 @@ def parse_annotation_table():
     Parses annotation file provided by Beatriz (rewrite when new annotations are done)
     '''
 
-    annotation_table_file = gzip.open('%stop40_all_proteins_norev_good.tbl.gz' % config.data_directory, "rt")
+    #annotation_table_file = gzip.open('%stop40_all_proteins_norev_good.tbl.gz' % config.data_directory, "rt")
+    annotation_table_file = gzip.open('%sgutsy25_all_metadata_phold.tsv.gz' % config.data_directory, "rt")
+    header = annotation_table_file.readline().strip().split('\t')
+    transl_table_idx = header.index('transl_table')
+    region_idx = header.index('Region')
 
     annotation_dict = {}
     for line in annotation_table_file:
-        line = line.strip()
+        line_split = line.strip().split('\t')
 
-        if '>' in line:
-            genome = line.split(' ')[-1]
-            #genome = line.split('\t')[-1]
-            annotation_dict[genome] = {}
-            annotation_dict[genome]['start_all'] = []
-            annotation_dict[genome]['stop_all'] = []
-            annotation_dict[genome]['type_all'] = []
+        if len(line_split) < 71:
+            continue
+
+        genome = line_split[4]
+
+        if 'CDS' in line_split:
             
-            annotation_dict[genome]['product_all'] = []
-            annotation_dict[genome]['locus_tag_all'] = []
-            annotation_dict[genome]['transl_table_all'] = []
+            # initialize entry
+            if genome not in annotation_dict:
 
-        else:
-            line_split = line.split('\t')
+                annotation_dict[genome] = {}
+                annotation_dict[genome]['gene_all'] = []
+                annotation_dict[genome]['start_all'] = []
+                annotation_dict[genome]['stop_all'] = []
+                annotation_dict[genome]['frame_all'] = []
+                annotation_dict[genome]['transl_table_all'] = []
+                annotation_dict[genome]['region_all'] = []
 
-            if 'CDS' in line_split:
-                annotation_dict[genome]['start_all'].append(int(line_split[0]))
-                annotation_dict[genome]['stop_all'].append(int(line_split[1]))
-                annotation_dict[genome]['type_all'].append(line_split[2])
+            annotation_dict[genome]['gene_all'].append(line_split[0])
+            annotation_dict[genome]['start_all'].append(int(line_split[1]))
+            annotation_dict[genome]['stop_all'].append(int(line_split[2]))
+            annotation_dict[genome]['frame_all'].append(line_split[3])
+            #annotation_dict[genome]['type_all'].append(line_split[2])
+            annotation_dict[genome]['transl_table_all'].append(int(line_split[transl_table_idx]))
+            annotation_dict[genome]['region_all'].append(line_split[region_idx])
 
-            if 'product' in line_split:
-                annotation_dict[genome]['product_all'].append(line_split[1])
+        #if 'product' in line_split:
+        #    annotation_dict[genome]['product_all'].append(line_split[1])
 
-            if 'locus_tag' in line_split:
-                annotation_dict[genome]['locus_tag_all'].append(line_split[1])
+        #if 'locus_tag' in line_split:
+        #    annotation_dict[genome]['locus_tag_all'].append(line_split[1])
 
-            if 'transl_table' in line_split:
-                annotation_dict[genome]['transl_table_all'].append(int(line_split[1]))
+        #if 'transl_table' in line_split:
+        #    annotation_dict[genome]['transl_table_all'].append(int(line_split[1]))
 
+
+    annotation_table_file.close()
 
     # save dictionary
     sys.stderr.write("Saving dictionary...\n")
@@ -1306,6 +1327,47 @@ def parse_annotation_table():
 
 
 def make_syn_sites_votu_dict(votu):
+
+    # New data from Jimmy has all genomes for a vOTU in an aligned fasta file
+    # rewritten function to parse that data structure
+
+    annotation_dict = pickle.load(open(annotation_dict_path, "rb"))
+
+    sys.stderr.write("Identifying fourfold status of mutations in %s....\n" % votu)
+
+    # get fasta files for the votu
+    file_path = glob.glob('%sSingle_vOTUs/Core_Alignments/*%s*.fna' % (config.data_directory, votu))[0]
+    fasta_all_genomes = classFASTA(file_path).readFASTA()
+    fasta_genome_dict = {x[0]:x[1] for x in fasta_all_genomes}
+
+    genomes_to_examine = list(set(fasta_genome_dict.keys()) & set(annotation_dict.keys()))
+
+    start_stop_genome_dict = {}
+    # numpy arrays for ease
+    for genome_ in genomes_to_examine:
+
+        start_stop_genome_dict[genome_] = {}
+        start_all = numpy.asarray(annotation_dict[genome_]['start_all'])
+        stop_all = numpy.asarray(annotation_dict[genome_]['stop_all'])
+        
+        start_stop_matrix = numpy.vstack((start_all, stop_all))
+        max_position_over_genes = numpy.max(start_stop_matrix, axis=0)
+        min_position_over_genes = numpy.min(start_stop_matrix, axis=0)
+        
+        start_stop_genome_dict[genome_]['start_all'] = start_all
+        start_stop_genome_dict[genome_]['stop_all'] = stop_all
+        start_stop_genome_dict[genome_]['max_position_over_genes'] = max_position_over_genes
+        start_stop_genome_dict[genome_]['min_position_over_genes'] = min_position_over_genes
+
+    # code changes here
+    #
+
+    print(genomes_to_examine)
+
+
+
+
+def make_syn_sites_votu_dict_from_pangraph(votu):
 
     '''
     Creates a fourfold status site dictionary for each genome in an OTU using annotation data.
@@ -1321,17 +1383,22 @@ def make_syn_sites_votu_dict(votu):
     #        print(set(annotation_dict[key]['transl_table_all']))
 
     sys.stderr.write("Identifying fourfold status of mutations in %s....\n" % votu)
-
     # get fasta files for the votu
     fasta_all_genomes = classFASTA('%suhgv_mgv_otu_fna/%s.fna' % (config.data_directory, votu)).readFASTA()
     fasta_genome_dict = {x[0]:x[1] for x in fasta_all_genomes}
 
     # get fasta files for the votu
-    pangraph_file_path = '%scomplete_minimap2/%s_complete_polished.json' % (config.data_directory, votu)
+    pangraph_file_path_all = glob.glob('%sSingle_vOTUs/Pangraphs/*%s*.json' % (config.data_directory, votu))
+
+    if len(pangraph_file_path_all) == 0:
+        return None
+    else:
+        pangraph_file_path = pangraph_file_path_all[0]
+
     pangraph_votu = load_pangraph_data(pangraph_file_path)
+    #pan = pypangraph.Pangraph.from_json(pangraph_file_path)
     pan = pypangraph.Pangraph.load_json(pangraph_file_path)
     loc = pypangraph.Locator(pan)
-
     genomes_to_examine = list(set(fasta_genome_dict.keys()) & set(annotation_dict.keys()))
 
     start_stop_genome_dict = {}
@@ -1365,7 +1432,6 @@ def make_syn_sites_votu_dict(votu):
 
         
         block_i_mutate = block_i['mutate']
-
         bl = pan.blocks[block_i_id]
         aln = bl.alignment
         sequences, occurrences = aln.generate_sequences()
@@ -1377,9 +1443,6 @@ def make_syn_sites_votu_dict(votu):
             
             positions_i_j = block_i['positions'][j]
             genome_name_i_j = positions_i_j[0]['name']
-
-            #if genome_name_i_j in genomes_to_ignore:
-            #    continue
 
             # strand refers to the orientation of the fragment of genome j that has block_i
             strand_i_j = positions_i_j[0]['strand']
@@ -1493,11 +1556,6 @@ def make_syn_sites_votu_dict(votu):
             # the positions of each fasta position in the current block
             sites_position_in_block_all = [loc.find_position(strain=genome_name_i_j, pos=h)[1] for h in sites_position_in_fasta_all]
             # the positions and allele of each mutation in the current block that are in CDS regions
-            #block_i_mutate_genome_j_in_cds = [x for x in block_i_mutate_genome_j if x[0] in sites_position_in_block_all ]
-
-            # no mutations in CDS regions! skip.
-            #if len(block_i_mutate_genome_j_in_cds) == 0:
-            #    continue
 
             # no CDS in the block! skip.
             if len(sites_position_in_block_all) == 0:
@@ -1532,3 +1590,86 @@ def make_syn_sites_votu_dict(votu):
 
 
 
+def computed_poisson_thinning(diffs, opportunities):
+    # apply this to calculation of all dN/dS
+    # specifically when calculating dS
+    thinned_diffs_1 = numpy.random.binomial(diffs, 0.5)
+    thinned_diffs_2 = diffs - thinned_diffs_1
+    d1 = thinned_diffs_1 / (opportunities.astype(float) / 2)
+    d2 = thinned_diffs_2 / (opportunities.astype(float) / 2)
+    return d1, d2
+
+
+
+
+
+def build_aligned_fasta_to_unaligned_fasta_position_dict(votu):
+
+    '''
+    Maps positions in the aligned FASTA sequence to positions in the unaligned FASTA
+    and provides 4D annotation status for each genome in a given OTU
+    '''
+
+    unaligned_fasta_path = '%suhgv_mgv_otu_fna/%s.fna' % (config.data_directory, votu) 
+    unaligned_fasta_nested_list = classFASTA(unaligned_fasta_path).readFASTA()
+
+    aligned_fasta_glob = glob.glob('%sSingle_vOTUs/Core_Alignments/*%s*.fna' % (config.data_directory, votu))
+    if len(aligned_fasta_glob) > 0:
+        aligned_fasta_path = aligned_fasta_glob[0]
+        aligned_fasta_nested_list = classFASTA(aligned_fasta_path).readFASTA()
+        
+        # build dictionray
+    annotation_dict = pickle.load(open(annotation_dict_path, "rb"))
+
+    unaligned_genome_names = [s[0] for s in unaligned_fasta_nested_list]
+    aligned_genome_names = [s[0] for s in aligned_fasta_nested_list]
+    genomes_names_intersection = list(set(unaligned_genome_names) & set(aligned_genome_names))
+
+    fasta_dict = {}
+    for genome_name in genomes_names_intersection:
+
+        fasta_dict[genome_name] = {}
+
+        unaligned_idx = unaligned_genome_names.index(genome_name)
+        aligned_idx = aligned_genome_names.index(genome_name)
+
+        unaligned_genome = unaligned_fasta_nested_list[unaligned_idx][1]
+        aligned_genome = aligned_fasta_nested_list[aligned_idx][1]
+
+        print(len(unaligned_genome), len(aligned_genome))
+
+
+
+        
+
+
+    #print(len(aligned_genome_names), len(genomes_intersection))
+    #print(len(genomes_intersection), len(aligned_fasta_nested_list[0]))
+    
+    
+
+    return None
+
+        
+    
+    
+
+def make_survival_dist(data, range_, probability=True):
+
+    data = data[numpy.isfinite(data)]
+    survival_array = [sum(data>=i) for i in range_]
+    #survival_array = [sum(data>=i)/len(data) for i in range_]
+    survival_array = numpy.asarray(survival_array)
+
+    if probability == True:
+        survival_array = survival_array/len(data)
+
+    return survival_array
+
+
+
+if __name__ == "__main__":
+
+    votu = 'vOTU-000010'
+
+    build_aligned_fasta_to_unaligned_fasta_position_dict(votu)
