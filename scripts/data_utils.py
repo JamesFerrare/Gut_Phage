@@ -9,6 +9,9 @@ import pickle
 import copy
 import glob
 import random
+import random
+import math
+
 from pathlib import Path
 
 
@@ -105,6 +108,39 @@ syn_sites_alignment_dict_path = config.data_directory + 'syn_sites_alignment_dic
 
 lifestyle_color_dict = {'both':'k', 'temperate':'#87CEEB', 'lytic':'#FF6347'}
 
+
+
+
+
+def index_to_pair(index, n):
+    '''
+    Maps a unique index to a unique pair (i, j) such that i < j
+    Solve for i using inverse triangular number
+    '''
+    
+    i = n - 2 - int(math.floor(math.sqrt(-8*index + 4*n*(n-1)-7)/2.0 - 0.5))
+    total_before_i = i * n - i * (i + 1) // 2
+    
+    # calculate k
+    j = index - total_before_i + i + 1
+    return i, j
+
+
+
+def random_unique_pairs(my_list, k):
+    n = len(my_list)
+    total_pairs = n * (n - 1) // 2
+
+    # Sample k unique indices from 0 to total_pairs - 1
+    sampled_indices = random.sample(range(total_pairs), k)
+
+    # Convert each index to a unique (i, j) pair
+    result = []
+    for idx in sampled_indices:
+        i, j = index_to_pair(idx, n)
+        result.append((my_list[i], my_list[j]))
+
+    return result
 
 
 

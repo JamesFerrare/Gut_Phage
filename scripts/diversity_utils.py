@@ -23,7 +23,7 @@ def calculate_consensus_genotypes(allele_counts_matrix,lower_threshold=0.2,upper
 
 
 #####################################################################
-def calculate_unbiased_sigmasquared(allele_counts_1, allele_counts_2):
+def calculate_unbiased_sigmasquared(n11s, n10s, n01s, n00s):
     
     '''
     Adapted from Garud, Good et al.
@@ -43,18 +43,11 @@ def calculate_unbiased_sigmasquared(allele_counts_1, allele_counts_2):
     
     # this asks which pairs of sites have depths >0 at BOTH sites
     # None here takes the product of the elements in the two vectors and returns a matrix. 
-    joint_passed_sites = (passed_sites_1)[None,:,:]*(passed_sites_2)[:,None,:]
+    #joint_passed_sites = (passed_sites_1)[None,:,:]*(passed_sites_2)[:,None,:]
     # sites x sites x samples matrix
     
     # allele counts
-    ns = joint_passed_sites.sum(axis=2)
-    
-    n11s = ((genotypes_1[None,:,:])*(genotypes_2[:,None,:])*joint_passed_sites).sum(axis=2)
-    n10s = (genotypes_1[None,:,:]*(1-genotypes_2[:,None,:])*joint_passed_sites).sum(axis=2)
-    n01s = ((1-genotypes_1[None,:,:])*(genotypes_2[:,None,:])*joint_passed_sites).sum(axis=2)
-    n00s = ((1-genotypes_1[None,:,:])*(1-genotypes_2[:,None,:])*joint_passed_sites).sum(axis=2)
-    
-
+    ns = n11s + n10s + n01s + n00s
     
     # First calculate numerator
     rsquared_numerators = n11s*(n11s-1)*n00s*(n00s-1)
