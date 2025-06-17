@@ -21,9 +21,9 @@ import numpy
 from scipy import stats
 import pandas
 
-from matplotlib import colors
-from matplotlib import cm
-import matplotlib as mpl
+#from matplotlib import colors
+#from matplotlib import cm
+#import matplotlib as mpl
 
 
 import pypangraph

@@ -27,7 +27,6 @@ min_ld_sample_size = config.between_host_ld_min_sample_size
 
 def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
     
-    #allele_counts_map_path_ = data_utils.allele_counts_map_path % votu
     allele_counts_map = pickle.load(open(data_utils.allele_counts_map_path % votu, "rb"))
     
     sites =  list(allele_counts_map['aligned_sites'].keys())
@@ -56,8 +55,9 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
        
         allele_count_dict = dict(Counter(alleles_s))
         # ignore sites with > 2 alleles        
+        # we do not care about invariant sites 
         nucleotide_intersect = set(allele_count_dict.keys()) & set(data_utils.nucleotides)
-        if len(nucleotide_intersect) > 2:
+        if len(nucleotide_intersect) != 2:
             continue
                 
         # define major allele
@@ -100,8 +100,7 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
     #print(len(sites_final))
     #pairs_ = data_utils.random_unique_pairs(sites_final, 10)
     #print(pairs_)
-    
-    
+        
     
     #for site_pair_idx, site_pair in enumerate(sites_final_pairs):
     n_pairs_processed = 0
@@ -123,7 +122,7 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
             if dist_12 >= max_d:
                 continue
             
-            if (n_pairs_processed % 1000000 == 0) and (n_pairs_processed > 0):                
+            if (n_pairs_processed % 100000 == 0) and (n_pairs_processed > 0):                
                 sys.stderr.write("%d site pairs processed...\n" % n_pairs_processed)  
                 print(ld_count_dict['data']['all'][1]['rsquared_numerators'], ld_count_dict['data']['all'][1]['rsquared_denominators'])
             
@@ -155,12 +154,14 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
                 ld_count_dict['data']['all'][dist_12]['rsquared_numerators'] = 0
                 ld_count_dict['data']['all'][dist_12]['rsquared_denominators'] = 0
                 ld_count_dict['data']['all'][dist_12]['n_site_pairs'] = 0
-                
+                ld_count_dict['data']['all'][dist_12]['n_site_pair_observations'] = 0
+
             
             ld_count_dict['data']['all'][dist_12]['rsquared_numerators'] += rsquared_numerators
             ld_count_dict['data']['all'][dist_12]['rsquared_denominators'] += rsquared_denominators
             ld_count_dict['data']['all'][dist_12]['n_site_pairs'] += 1
-        
+            ld_count_dict['data']['all'][dist_12]['n_site_pair_observations'] += len(allele_bool_idx_final_2)
+
         
             #ld_count_dict['data']['all']['site_pairs'].append(site_pair)
             #ld_count_dict['data']['all']['ns'].append(n)
@@ -183,6 +184,11 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
                 #n_var = sum(no_nan_bool_idx_inter*variant_type_idx)
                 allele_bool_var_idx_1 = allele_bool_idx_1[no_nan_bool_idx_inter*variant_type_idx]
                 allele_bool_var_idx_2 = allele_bool_idx_2[no_nan_bool_idx_inter*variant_type_idx]
+                                
+                # make sure the site is biallelic
+                if (sum(allele_bool_var_idx_1) + sum(allele_bool_var_idx_2) == 0) or (sum(allele_bool_var_idx_1) + sum(allele_bool_var_idx_2) == len(allele_bool_var_idx_1) + len(allele_bool_var_idx_2)):
+                    continue
+                
                 
                 n11_var = sum(allele_bool_var_idx_1*allele_bool_var_idx_2)
                 n10_var = sum(allele_bool_var_idx_1*(~allele_bool_var_idx_2))
@@ -197,11 +203,13 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
                     ld_count_dict['data'][variant_type][dist_12]['rsquared_numerators'] = 0
                     ld_count_dict['data'][variant_type][dist_12]['rsquared_denominators'] = 0
                     ld_count_dict['data'][variant_type][dist_12]['n_site_pairs'] = 0
+                    ld_count_dict['data'][variant_type][dist_12]['n_site_pair_observations'] = 0
 
                 
                 ld_count_dict['data'][variant_type][dist_12]['rsquared_numerators'] += rsquared_numerators_var
                 ld_count_dict['data'][variant_type][dist_12]['rsquared_denominators'] += rsquared_denominators_var
                 ld_count_dict['data'][variant_type][dist_12]['n_site_pairs'] += 1
+                ld_count_dict['data'][variant_type][dist_12]['n_site_pair_observations'] += len(allele_bool_var_idx_2)
  
                 #ld_count_dict['data'][variant_type]['site_pairs'].append(site_pair)
                 #ld_count_dict['data'][variant_type]['ns'].append(n_var)
