@@ -51,6 +51,9 @@ div_dict_path_template = config.data_directory + 'divergence_dict_all/%s.pickle'
 #div_dict_directory = '%sdivergence_dict_all/' % config.data_directory
 syn_sites_path_template =  config.data_directory + 'syn_sites_dict_all/%s.pickle'
 
+div_dict_alignment_path_template = config.data_directory + 'divergence_dict_alignment_all/%s.pickle'
+
+
 #syn_sites_path = '%s%s.pickle' % (syn_sites_directory, votu)
 #minimap_path =  config.data_directory + 'complete_minimap2/%s_complete_polished.json'
 #minimap_path =  config.data_directory + 'Single_vOTUs/%s_complete_polished.json'
@@ -58,7 +61,7 @@ syn_sites_path_template =  config.data_directory + 'syn_sites_dict_all/%s.pickle
 
 
 
-def calculate_divergence(votu, n_pairs=None):#, n_genomes_subsample=6):
+def calculate_divergence_pangraph(votu, n_pairs=None):#, n_genomes_subsample=6):
 
     # make dictionary of divergences 
         
@@ -158,6 +161,117 @@ def calculate_divergence(votu, n_pairs=None):#, n_genomes_subsample=6):
             sys.stderr.write("Done!\n")
 
 
+
+
+
+def calculate_divergence_alignment(votu, max_fraction_nan=0, min_sample_size=1, n_pairs=None):#, n_genomes_subsample=6):
+    
+    allele_counts_map = pickle.load(open(data_utils.allele_counts_map_path % votu, "rb"))
+    allele_counts_map_filtered = data_utils.filter_allele_counts_map(allele_counts_map,  max_fraction_nan=max_fraction_nan, min_sample_size=min_sample_size, only_biallelic=False)
+
+    # this map contains the same sites that are used to calculate LD
+    # so estimates of divergence calculated here can be used to fit the LD null model.
+    
+    sys.stderr.write("Calculating pairwise divergences for %s\n" % votu)  
+    
+    genomes = allele_counts_map_filtered['genomes']
+    #genomes = genomes[:3]
+    n_genomes = len(genomes)
+    
+    genome_dict = {}
+    for g in genomes:
+        genome_dict[g] = {}
+        #genome_dict[g]['major_allele'] = []
+        genome_dict[g]['fourfold_status'] = []
+        genome_dict[g]['no_nan_bool_idx'] = []
+        genome_dict[g]['allele_bool_idx'] = []
+        
+
+    sites_final = list(allele_counts_map_filtered['aligned_sites'].keys())
+    sites_final.sort()
+    
+    for s in sites_final:
+        
+        for g_idx in range(n_genomes):
+            
+            genome_g = genomes[g_idx]
+            
+            #genome_dict[genome_g]['major_allele'].append( allele_counts_map_filtered['aligned_sites'][s]['major_allele'][g_idx] )
+            genome_dict[genome_g]['fourfold_status'].append( allele_counts_map_filtered['aligned_sites'][s]['fourfold_status'][g_idx] )
+            genome_dict[genome_g]['no_nan_bool_idx'].append( allele_counts_map_filtered['aligned_sites'][s]['no_nan_bool_idx'][g_idx] )
+            genome_dict[genome_g]['allele_bool_idx'].append( allele_counts_map_filtered['aligned_sites'][s]['allele_bool_idx'][g_idx] )
+            
+            #if allele_counts_map_filtered['aligned_sites'][s]['fourfold_status'][g_idx] != None:
+            #    print(allele_counts_map_filtered['aligned_sites'][s]['fourfold_status'][g_idx])
+
+            
+    # make numpy arrays
+    for genome in genomes:
+        
+        for k in ['fourfold_status', 'no_nan_bool_idx', 'allele_bool_idx']:
+            k_list = genome_dict[genome][k]
+            genome_dict[genome][k] = numpy.asarray(k_list)
+
+            
+    # calculate divergence....
+    genome_pair_all = list(combinations(genomes,2))   
+    div_dict = {}
+    for genome_pair_idx, genome_pair in enumerate(genome_pair_all):
+        
+        if (genome_pair_idx % 10000 == 0) and (genome_pair_idx > 0):                
+            sys.stderr.write("%d genome pairs processed...\n" % genome_pair_idx)  
+        
+        
+        fourfold_status_i = genome_dict[genome_pair[0]]['fourfold_status']
+        fourfold_status_j = genome_dict[genome_pair[1]]['fourfold_status']
+        
+        no_nan_bool_idx_i = genome_dict[genome_pair[0]]['no_nan_bool_idx']
+        no_nan_bool_idx_j = genome_dict[genome_pair[1]]['no_nan_bool_idx']
+        
+        allele_bool_idx_i = genome_dict[genome_pair[0]]['allele_bool_idx']
+        allele_bool_idx_j = genome_dict[genome_pair[1]]['allele_bool_idx']
+        
+        #print(fourfold_status_i[fourfold_status_i!=None])
+        #print(numpy.unique(fourfold_status_i))
+        
+        to_keep_idx = no_nan_bool_idx_i*no_nan_bool_idx_j
+        n_div_total = sum(allele_bool_idx_i[to_keep_idx] != allele_bool_idx_j[to_keep_idx])
+        n_sites_total = sum(to_keep_idx)
+                
+        #for v in variant_types:
+        to_keep_syn_idx = to_keep_idx*(fourfold_status_i==3)*(fourfold_status_j==3)
+        n_div_syn = sum(allele_bool_idx_i[to_keep_syn_idx] != allele_bool_idx_j[to_keep_syn_idx])
+        n_sites_syn = sum(to_keep_syn_idx) 
+        
+        to_keep_nonsyn_idx = to_keep_idx*(fourfold_status_i==0)*(fourfold_status_j==0)
+        n_div_nonsyn = sum(allele_bool_idx_i[to_keep_nonsyn_idx] != allele_bool_idx_j[to_keep_nonsyn_idx])
+        n_sites_nonsyn = sum(to_keep_nonsyn_idx)
+    
+        div_dict[genome_pair] = {}
+        div_dict[genome_pair]['total'] = {}
+        div_dict[genome_pair]['total']['n_div'] = n_div_total
+        div_dict[genome_pair]['total']['n_sites'] = n_sites_total
+
+        div_dict[genome_pair][0] = {}
+        div_dict[genome_pair][0]['n_div'] = n_div_syn
+        div_dict[genome_pair][0]['n_sites'] = n_sites_syn
+        
+        div_dict[genome_pair][3] = {}
+        div_dict[genome_pair][3]['n_div'] = n_div_nonsyn
+        div_dict[genome_pair][3]['n_sites'] = n_sites_nonsyn
+
+
+    
+    
+    sys.stderr.write("Saving dictionary...\n")
+    with open(div_dict_alignment_path_template % votu, 'wb') as handle:
+        pickle.dump(div_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    sys.stderr.write("Done!\n")
+
+
+        
+    
+    
 
 
 
@@ -717,12 +831,12 @@ def plot_ds_vs_dnds_dist_axis(votu, pseudocount=0, min_n_muts=50, min_n_sites=1e
 
 
 
-def multiprocessing_calculate_divergence(votu, n_pairs):
+def multiprocessing_calculate_divergence_pangraph(votu, n_pairs):
 
     tic = time.time()
     #pool = multiprocessing.Pool(processes=os.cpu_count())
     pool = multiprocessing.Pool(processes=6)
-    res = pool.apply_async(calculate_divergence, args=(votu, n_pairs))
+    res = pool.apply_async(calculate_divergence_pangraph, args=(votu, n_pairs))
 
     pool.close()
     pool.join()
@@ -1372,9 +1486,12 @@ def syn_div_nonsyn_ratio_dip_test(min_n_muts=50, min_n_sites=1e3, min_n_pairs=50
 if __name__ == "__main__":
 
     votu_all = data_utils.get_single_votus()
-    syn_div_nonsyn_ratio_dip_test()
+    #syn_div_nonsyn_ratio_dip_test()
     #start_idx = votu_all.index('vOTU-000005') + 1 
     #votu_all = votu_all[start_idx:]
+    
+    votu = 'vOTU-000010'
+    calculate_divergence_alignment(votu)
     
     #syn_div_nonsyn_ratio_dip_test()
     
@@ -1389,7 +1506,10 @@ if __name__ == "__main__":
 
         #data_utils.build_votu_fasta(votu, build_votu_fasta=True)
         #data_utils.make_syn_sites_votu_dict_from_pangraph(votu)
+        #calculate_divergence_pangraph(votu)
+        
         #calculate_divergence(votu)
+        
 
 
 

@@ -28,63 +28,16 @@ min_ld_sample_size = config.between_host_ld_min_sample_size
 def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
     
     allele_counts_map = pickle.load(open(data_utils.allele_counts_map_path % votu, "rb"))
-    
-    sites =  list(allele_counts_map['aligned_sites'].keys())
-    
-    genomes = allele_counts_map['genomes']
-    #genome_pairs_idx = list(combinations(range(len(genomes)), 2))
-    n_genomes = len(genomes)
-    
-    # do not calculate LD if there aren't enough genomes
-    if n_genomes < min_sample_size:
-        return
-        
+    allele_counts_map_filtered = data_utils.filter_allele_counts_map(allele_counts_map,  max_fraction_nan=max_fraction_nan, min_sample_size=min_sample_size)
+
     # get sites with not too many NaNs
-    sites_final = []
-    for s in sites:
-        
-        #alleles = numpy.asarray(allele_counts_map['aligned_sites'][s]['alleles'])
-        #fourfold_status = numpy.asarray(allele_counts_map['aligned_sites'][s]['fourfold_status'])
-        #fraction_nan = sum(alleles=='-')/len(alleles)
-        alleles_s = allele_counts_map['aligned_sites'][s]['alleles']
-        fraction_nan = alleles_s.count('-')/n_genomes
-        
-        # insufficient number of informative sites
-        if fraction_nan > max_fraction_nan:
-            continue 
-       
-        allele_count_dict = dict(Counter(alleles_s))
-        # ignore sites with > 2 alleles        
-        # we do not care about invariant sites 
-        nucleotide_intersect = set(allele_count_dict.keys()) & set(data_utils.nucleotides)
-        if len(nucleotide_intersect) != 2:
-            continue
-                
-        # define major allele
-        major_allele = max(list(nucleotide_intersect), key=lambda k: allele_count_dict[k])
-        #major_allele = list(nucleotide_intersect - set(minor_allele))[0]
-        allele_counts_map['aligned_sites'][s]['major_allele'] = major_allele
-        allele_counts_map['aligned_sites'][s]['n_alleles'] = len(nucleotide_intersect)
-        allele_counts_map['aligned_sites'][s]['n_obs_no_nan'] = sum(allele_count_dict.values())
-        
-        # make numpy arrays
-        no_nan_bool_idx = numpy.asarray([x != '-' for x in  alleles_s])
-        # True if = minor allele or '-'
-        allele_bool_idx = numpy.asarray([x != major_allele for x in  alleles_s])
-        
-        allele_counts_map['aligned_sites'][s]['no_nan_bool_idx'] = no_nan_bool_idx
-        allele_counts_map['aligned_sites'][s]['allele_bool_idx'] = allele_bool_idx
-        
-        fourfold_status = allele_counts_map['aligned_sites'][s]['fourfold_status']
-        allele_counts_map['aligned_sites'][s]['fourfold_status'] = numpy.asarray(fourfold_status)
-        
-        sites_final.append(s)
-    
+    sites_final = list(allele_counts_map_filtered.keys())
+    sites_final.sorted()
     
     
     ld_count_dict = {}
     ld_count_dict['data'] = {}
-    ld_count_dict['genomes'] = genomes
+    ld_count_dict['genomes'] = allele_counts_map_filtered['genomes']
     for variant_type in data_utils.variant_types + ['all']:
         ld_count_dict['data'][variant_type] = {}
         #ld_count_dict['data'][variant_type]['site_pairs'] = []
@@ -94,13 +47,7 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
         #ld_count_dict['data'][variant_type]['n01s'] = []
         #ld_count_dict['data'][variant_type]['n00s'] = []
         
-        
-    #sites_final = sites_final[:20]
-    #sites_final_pairs = list(combinations(sites_final, 2))
-    #print(len(sites_final))
-    #pairs_ = data_utils.random_unique_pairs(sites_final, 10)
-    #print(pairs_)
-        
+
     
     #for site_pair_idx, site_pair in enumerate(sites_final_pairs):
     n_pairs_processed = 0
@@ -124,17 +71,16 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
             
             if (n_pairs_processed % 100000 == 0) and (n_pairs_processed > 0):                
                 sys.stderr.write("%d site pairs processed...\n" % n_pairs_processed)  
-                print(ld_count_dict['data']['all'][1]['rsquared_numerators'], ld_count_dict['data']['all'][1]['rsquared_denominators'])
             
             # genomes with nucleotides in both sites
-            no_nan_bool_idx_1 = allele_counts_map['aligned_sites'][s_1]['no_nan_bool_idx']
-            no_nan_bool_idx_2 = allele_counts_map['aligned_sites'][s_2]['no_nan_bool_idx']
+            no_nan_bool_idx_1 = allele_counts_map_filtered['aligned_sites'][s_1]['no_nan_bool_idx']
+            no_nan_bool_idx_2 = allele_counts_map_filtered['aligned_sites'][s_2]['no_nan_bool_idx']
             no_nan_bool_idx_inter = no_nan_bool_idx_1 * no_nan_bool_idx_2
             
             #n = sum(no_nan_bool_idx_inter)
             
-            allele_bool_idx_1 = allele_counts_map['aligned_sites'][s_1]['allele_bool_idx']
-            allele_bool_idx_2 = allele_counts_map['aligned_sites'][s_2]['allele_bool_idx']
+            allele_bool_idx_1 = allele_counts_map_filtered['aligned_sites'][s_1]['allele_bool_idx']
+            allele_bool_idx_2 = allele_counts_map_filtered['aligned_sites'][s_2]['allele_bool_idx']
 
             allele_bool_idx_final_1 = allele_bool_idx_1[no_nan_bool_idx_inter]
             allele_bool_idx_final_2 = allele_bool_idx_2[no_nan_bool_idx_inter]
@@ -170,8 +116,8 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
             #ld_count_dict['data']['all']['n01s'].append(n01)
             #ld_count_dict['data']['all']['n00s'].append(n00)
         
-            fourfold_status_1 = allele_counts_map['aligned_sites'][s_1]['fourfold_status']
-            fourfold_status_2 = allele_counts_map['aligned_sites'][s_2]['fourfold_status']
+            fourfold_status_1 = allele_counts_map_filtered['aligned_sites'][s_1]['fourfold_status']
+            fourfold_status_2 = allele_counts_map_filtered['aligned_sites'][s_2]['fourfold_status']
             
             for variant_type in data_utils.variant_types:
                 # check whether both sites have trhe same fourfold status in each genome
@@ -221,7 +167,7 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
                 #n_pairs_processed_var += 1
                 
                 
-            #n_pairs_processed += 1  
+            n_pairs_processed += 1  
            
 
     
@@ -237,11 +183,17 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
 
 if __name__ == "__main__":
 
-    votu = 'vOTU-000010'
+    #votu = 'vOTU-000010'
     #votu_all = [votu]
     #build_allele_counts_map(votu)
     
-    build_ld_counts_dict(votu, max_fraction_nan=0.0)
+    votu_all = data_utils.get_single_votus()
     
-    #annotation_dict = pickle.load(open(ld_counts_dict_path % votu, "rb"))
+    for votu in votu_all:
+
+        if votu in data_utils.votu_to_skip:
+            continue
+    
+        build_ld_counts_dict(votu, max_fraction_nan=0.0)
+    
     

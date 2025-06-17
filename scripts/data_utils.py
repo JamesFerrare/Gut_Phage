@@ -1930,6 +1930,72 @@ def build_allele_counts_map(votu):
 
 
     
+    
+def filter_allele_counts_map(allele_counts_map, max_fraction_nan=0, min_sample_size=0, only_biallelic=True):
+    
+    '''
+    only_biallelic: boolean variable asking whether to only return sites with two alleles (True) or one and two alleles (False) 
+    
+    returns the dictionary
+    no_nan_bool_idx = bool for whether that that genome has (True) or does not have (False) a nucleotide at that site
+    allele_bool_idx = bool for whether that that genome has the minor (True) or major allele (False)
+    
+    no_nan_bool_idx * allele_bool_idx: index of genomes where an allele is present and where it is *minor*
+    '''
+    
+    sites =  list(allele_counts_map['aligned_sites'].keys())
+    
+    genomes = allele_counts_map['genomes']
+    #genome_pairs_idx = list(combinations(range(len(genomes)), 2))
+    n_genomes = len(genomes)
+    
+    if n_genomes < min_sample_size:
+        return {}
+    
+    else:
+        
+        allele_counts_map_new = {}
+        allele_counts_map_new['genomes'] = genomes
+        allele_counts_map_new['aligned_sites'] = {}
+
+        for s in sites:
+            
+            alleles_s = allele_counts_map['aligned_sites'][s]['alleles']
+            fraction_nan = alleles_s.count('-')/n_genomes
+            
+            # insufficient number of informative sites
+            if fraction_nan > max_fraction_nan:
+                continue 
+        
+            allele_count_dict = dict(Counter(alleles_s))
+            # ignore sites with > 2 alleles        
+            # we do not care about invariant sites 
+            nucleotide_intersect = set(allele_count_dict.keys()) & set(nucleotides)
+            if len(nucleotide_intersect) != 2:
+                continue
+                    
+            # define major allele
+            major_allele = max(list(nucleotide_intersect), key=lambda k: allele_count_dict[k])
+        
+            allele_counts_map_new['aligned_sites'][s] = {}
+            #major_allele = list(nucleotide_intersect - set(minor_allele))[0]
+            allele_counts_map_new['aligned_sites'][s]['major_allele'] = major_allele
+            #allele_counts_map_new['aligned_sites'][s]['n_alleles'] = len(nucleotide_intersect)
+            allele_counts_map_new['aligned_sites'][s]['n_obs_no_nan'] = sum(allele_count_dict.values())
+            
+            # make numpy arrays
+            no_nan_bool_idx = numpy.asarray([x != '-' for x in  alleles_s])
+            # True if = minor allele or '-'
+            allele_bool_idx = numpy.asarray([x != major_allele for x in  alleles_s])
+            
+            allele_counts_map_new['aligned_sites'][s]['no_nan_bool_idx'] = no_nan_bool_idx
+            allele_counts_map_new['aligned_sites'][s]['allele_bool_idx'] = allele_bool_idx
+            
+            fourfold_status = allele_counts_map['aligned_sites'][s]['fourfold_status']
+            allele_counts_map_new['aligned_sites'][s]['fourfold_status'] = numpy.asarray(fourfold_status)
+        
+    
+        return allele_counts_map_new
 
     
 

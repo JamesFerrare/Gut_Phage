@@ -1,6 +1,7 @@
 
 
 import numpy
+from scipy.optimize import least_squares, newton, brentq
 
 
 
@@ -104,3 +105,51 @@ def calculate_unbiased_sigmasquared(n11s, n10s, n01s, n00s):
     return rsquared_numerators, rsquared_denominators
 
 
+
+def predict_qle_ld(nr, l, c):
+    
+    nrl = nr*l
+    
+    return c * (10 + 2*nrl) / (22 + 26*nrl + 4*(nrl**2))
+
+
+def neutral_rsquared(NRs):
+    return (10.0+2*NRs)/(22.0+26*NRs+4*NRs*NRs)
+    
+def normalized_neutral_rsquared(NRs):
+    return neutral_rsquared(NRs)/neutral_rsquared(0)
+    
+def calculate_effective_NR(rsquared_ratio):
+    return brentq(lambda x: normalized_neutral_rsquared(x)-rsquared_ratio, 0, 1e09)
+
+
+def predict_ld_rbymu(distances, rsquareds, pi, reference_bp=9):
+    
+    idx_9 = numpy.where(distances==reference_bp)[0][0]
+    
+    rbymu_2 = []
+    rbymu_4 = []
+
+    # now do rbymu estimate
+    if rsquareds[-1] < rsquareds[idx_9]/2:
+
+        NRstar = calculate_effective_NR(0.5)
+        lstar = distances[(rsquareds/rsquareds[idx_9]<=0.5)][0]
+        # Old version
+        rbymu_2 = NRstar/lstar/pi*2
+                
+        if rsquareds.min() < rsquareds[idx_9]/4:
+            critical_fraction = 0.25
+        else:
+            critical_fraction = rsquareds.min()/rsquareds[idx_9]
+            
+        if True:
+            NRstar = calculate_effective_NR(critical_fraction)
+            # get first point where LD/LD(0)<0.5
+            lstar = distances[(rsquareds/rsquareds[idx_9]<=critical_fraction)][0]
+            # Old version
+            rbymu_4 = NRstar/lstar/pi*2
+    
+    
+    return rbymu_2, rbymu_4
+     
