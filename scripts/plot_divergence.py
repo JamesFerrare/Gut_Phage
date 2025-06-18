@@ -783,7 +783,6 @@ def plot_ds_vs_dnds_dist_axis(votu, pseudocount=0, min_n_muts=50, min_n_sites=1e
     #cumulative_n_syn_all, cumulative_n_nonsyn_all, cumulative_block_len_syn_all, cumulative_block_len_nonsyn_all = calculate_syn_div_and_nonsyn_ratio(votu, min_n_muts=min_n_muts, min_n_sites=min_n_sites, check_metadata=check_metadata)
     cumulative_n_syn_all, cumulative_n_nonsyn_all, cumulative_block_len_syn_all, cumulative_block_len_nonsyn_all, genome_pairs_clean_all = calculate_syn_div_and_nonsyn_ratio_alignment(votu, min_n_muts=min_n_muts, min_n_sites=min_n_sites, check_metadata=check_metadata)
 
-
     # only make plot if sufficient # data points (genome pairs)    
     if len(cumulative_n_syn_all) < min_n_pairs:
         sys.stderr.write("No plot, insufficient # genome pairs.\n")
@@ -1582,14 +1581,15 @@ if __name__ == "__main__":
     #start_idx = votu_all.index('vOTU-000005') + 1 
     #votu_all = votu_all[start_idx:]
     
-    #votu = 'vOTU-000010'
+    votu = 'vOTU-000010'
     #cumulative_n_syn_all, cumulative_n_nonsyn_all, cumulative_block_len_syn_all, cumulative_block_len_nonsyn_all = calculate_syn_div_and_nonsyn_ratio_alignment(votu)
     
     #calculate_divergence_alignment(votu)
+    plot_ds_vs_dnds_dist_axis(votu)
     
-    for votu in votu_all:
+    #for votu in votu_all:
         
-        calculate_divergence_alignment(votu)
+    #    calculate_divergence_alignment(votu)
     
     #plot_ds_vs_dnds_dist_axis(votu, min_n_pairs=10, min_n_muts=10, min_n_sites=100)
     #print((cumulative_n_nonsyn_all/cumulative_block_len_nonsyn_all) / (cumulative_n_syn_all/cumulative_block_len_syn_all)) 

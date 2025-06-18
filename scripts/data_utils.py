@@ -1634,31 +1634,54 @@ def make_syn_sites_votu_dict_from_alignment(votu):
             # start_g starts counting at ONE
             start_g = annotation_dict[genome]['start_all'][g_idx]
             stop_g = annotation_dict[genome]['stop_all'][g_idx]
-            seq_g = fasta_genome[start_g-1:stop_g]
+            frame_g = annotation_dict[genome]['frame_all'][g_idx]
+            #transl_table_g = annotation_dict[genome]['transl_table_all'][g_idx]
+            # transl_table_all == 11 for all genes
+            
+            # reverse complement
+            if frame_g == '-':
+                seq_g = fasta_genome[stop_g-1:start_g]
+                seq_g = calculate_reverse_complement_sequence(seq_g)
+                
+            else:
+                seq_g = fasta_genome[start_g-1:stop_g]
+                
                         
             # check if we need the reverse complement
             #print(annotation_dict[genome]['frame_all'])
             # minus reading frame
-            if annotation_dict[genome]['frame_all'] == '-':
-                seq_g = calculate_reverse_complement_sequence(seq_g)
+            #if frame_g == '-':
+            #    seq_g = calculate_reverse_complement_sequence(seq_g)
             
             if genome not in syn_sites_dict:
                 syn_sites_dict[genome] = {}
-                        
+                
+            #if len(seq_g) == 0:
+            #    print(seq_g)
+            
+            syn_status_g = []
             # loop among positions within the gene
-            for position_in_gene in list( range(len(seq_g))): #calculate codon start
+            for position_in_gene in list(range(len(seq_g))): #calculate codon start
                 # start position of codon
                    
                 codon_start = int((position_in_gene)/3)*3
                 codon = seq_g[codon_start:codon_start+3] 
-                position_in_codon = position_in_gene%3
-                
-                syn_status = codon_synonymous_opportunity_table[codon][position_in_codon]
+                position_in_codon = position_in_gene%3                
+                syn_status_g.append(codon_synonymous_opportunity_table[codon][position_in_codon])
+            
+            # if the gene is on the '-' strand,
+            # then the positions of the fourfold status do not match 
+            # the positions of the alleles
+            if frame_g == '-':
+                # so the positions match for reverse complement
+                syn_status_g = syn_status_g[::-1]
                                                 
+                                                
+            for position_in_gene in list(range(len(seq_g))):
                 # counting here starts at ONE
-                syn_sites_dict[genome][start_g+position_in_gene] = syn_status
-    
- 
+                syn_sites_dict[genome][start_g+position_in_gene] = syn_status_g[position_in_gene]
+
+
     
     sys.stderr.write("Saving dictionary...\n")
     with open(syn_sites_alignment_dict_path % votu, 'wb') as handle:
@@ -1871,9 +1894,7 @@ def build_allele_counts_map(votu):
                     
             
             fourfold_site.append(fourfold_g_site)      
-        
-        print(fourfold_site)
-        
+                
         # site_g_aligned position starts counting at ONE 
         # because the aligned (pangraph) and unaligned (annotation) data starts counting at one
         allele_counts_map['aligned_sites'][site_g_aligned] = {}
@@ -1974,20 +1995,21 @@ def filter_allele_counts_map(allele_counts_map, max_fraction_nan=0, min_sample_s
 
 if __name__ == "__main__":
 
-    votu = 'vOTU-000010'
+    votu = 'vOTU-000001'
     
-    build_allele_counts_map(votu)
+    #make_syn_sites_votu_dict_from_alignment(votu)
+    #build_allele_counts_map(votu)
+
+    #make_syn_sites_votu_dict_from_alignment(votu)
     
     votu_all = get_single_votus()
 
     for votu in votu_all:
+                
+        #print(votu)
         
-        continue
-        
-        print(votu)
-        
-        #map_sites_original_to_core(votu)
-        #make_syn_sites_votu_dict_from_alignment(votu)
+        ##map_sites_original_to_core(votu)
+        make_syn_sites_votu_dict_from_alignment(votu)
         build_allele_counts_map(votu)
     
     
