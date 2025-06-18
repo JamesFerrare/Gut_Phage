@@ -39,7 +39,7 @@ random.seed(123456789)
 
 
 
-map_sites_original_to_core_path = config.data_directory + 'Single_vOTUs/map_sites_original_to_core/%s.pkl'
+map_sites_core_to_original_path = config.data_directory + 'Single_vOTUs/map_sites_core_to_original/%s.pkl'
 allele_counts_map_path = config.data_directory + 'allele_counts_map_all/%s.pkl'
 
 
@@ -689,13 +689,19 @@ def coarse_grain_abundances_by_taxonomy(count_array, votus, uhgv_votu_metadata_d
 
 
 
-def get_single_votus():
+def get_single_votus(remove_bad_votus=True):
 
     directory = Path('%sSingle_vOTUs/Core_Alignments/' % config.data_directory)
     files = [f.name for f in directory.iterdir() if f.is_file() and ('.fna' in f.name)]
     votu_all = [f.split('_')[2] for f in files]
     votu_all.sort()
-    return votu_all
+    
+    if remove_bad_votus == True:
+        votu_all_ = [x for x in votu_all if x not in votu_to_skip]
+    else:
+        votu_all_ = votu_all
+    
+    return votu_all_
 
 
 
@@ -1607,9 +1613,6 @@ def make_syn_sites_votu_dict_from_alignment(votu):
     
     sys.stderr.write("Identifying fourfold status of mutations in %s....\n" % votu)
     # get fasta files for the votu
-    fasta_all_genomes = classFASTA('%suhgv_mgv_otu_fna/%s.fna' % (config.data_directory, votu)).readFASTA()
-    fasta_genome_dict = {x[0]:x[1] for x in fasta_all_genomes}
-
     # get unaligned genomes    
     fasta_all_genomes = classFASTA('%suhgv_mgv_otu_fna/%s.fna' % (config.data_directory, votu)).readFASTA()
     fasta_genome_dict = {x[0]:x[1] for x in fasta_all_genomes}
@@ -1631,13 +1634,13 @@ def make_syn_sites_votu_dict_from_alignment(votu):
             # start_g starts counting at ONE
             start_g = annotation_dict[genome]['start_all'][g_idx]
             stop_g = annotation_dict[genome]['stop_all'][g_idx]
-            
             seq_g = fasta_genome[start_g-1:stop_g]
-            
+                        
             # check if we need the reverse complement
-            if annotation_dict[genome]['frame_all'] == False:
+            #print(annotation_dict[genome]['frame_all'])
+            # minus reading frame
+            if annotation_dict[genome]['frame_all'] == '-':
                 seq_g = calculate_reverse_complement_sequence(seq_g)
-            
             
             if genome not in syn_sites_dict:
                 syn_sites_dict[genome] = {}
@@ -1645,15 +1648,17 @@ def make_syn_sites_votu_dict_from_alignment(votu):
             # loop among positions within the gene
             for position_in_gene in list( range(len(seq_g))): #calculate codon start
                 # start position of codon
+                   
                 codon_start = int((position_in_gene)/3)*3
                 codon = seq_g[codon_start:codon_start+3] 
                 position_in_codon = position_in_gene%3
                 
                 syn_status = codon_synonymous_opportunity_table[codon][position_in_codon]
-                                
+                                                
                 # counting here starts at ONE
                 syn_sites_dict[genome][start_g+position_in_gene] = syn_status
     
+ 
     
     sys.stderr.write("Saving dictionary...\n")
     with open(syn_sites_alignment_dict_path % votu, 'wb') as handle:
@@ -1683,52 +1688,6 @@ def computed_poisson_thinning(diffs, opportunities):
 
 
 
-def build_aligned_fasta_to_unaligned_fasta_position_dict(votu):
-
-    '''
-    Maps positions in the aligned FASTA sequence to positions in the unaligned FASTA
-    and provides 4D annotation status for each genome in a given OTU
-    '''
-
-    unaligned_fasta_path = '%suhgv_mgv_otu_fna/%s.fna' % (config.data_directory, votu) 
-    unaligned_fasta_nested_list = classFASTA(unaligned_fasta_path).readFASTA()
-
-    aligned_fasta_glob = glob.glob('%sSingle_vOTUs/Core_Alignments/*%s*.fna' % (config.data_directory, votu))
-    if len(aligned_fasta_glob) > 0:
-        aligned_fasta_path = aligned_fasta_glob[0]
-        aligned_fasta_nested_list = classFASTA(aligned_fasta_path).readFASTA()
-        
-        # build dictionray
-    annotation_dict = pickle.load(open(annotation_dict_path, "rb"))
-
-    unaligned_genome_names = [s[0] for s in unaligned_fasta_nested_list]
-    aligned_genome_names = [s[0] for s in aligned_fasta_nested_list]
-    genomes_names_intersection = list(set(unaligned_genome_names) & set(aligned_genome_names))
-
-    fasta_dict = {}
-    for genome_name in genomes_names_intersection:
-
-        fasta_dict[genome_name] = {}
-
-        unaligned_idx = unaligned_genome_names.index(genome_name)
-        aligned_idx = aligned_genome_names.index(genome_name)
-
-        unaligned_genome = unaligned_fasta_nested_list[unaligned_idx][1]
-        aligned_genome = aligned_fasta_nested_list[aligned_idx][1]
-
-        print(len(unaligned_genome), len(aligned_genome))
-
-
-
-        
-
-
-    #print(len(aligned_genome_names), len(genomes_intersection))
-    #print(len(genomes_intersection), len(aligned_fasta_nested_list[0]))
-    
-    
-
-    return None
 
         
     
@@ -1748,13 +1707,13 @@ def make_survival_dist(data, range_, probability=True):
 
 
 
-def map_sites_original_to_core(votu):
+def map_sites_core_to_original(votu):
     
     '''
-    Function adapted from Jimmy's script to create a dictionary that maps the position of sites in the unaligned genomes
-    to their corresponding sites in the aligned genomes
+    Function adapted from Jimmy's script to create a dictionary that maps the position of sites in the aligned genomes
+    to their corresponding sites in the unaligned genomes
     
-    Positions for both aligned and unaligned genomes start at ONE (not zero, the Python indexing)
+    Positions for both aligned and unaligned genomes start at ONE (not zero)
     '''
     
     # get fasta files for the votu
@@ -1830,7 +1789,8 @@ def map_sites_original_to_core(votu):
                 continue
         #create txt file and save dictionary
         #output_file = os.path.join(output_dir, f'{strain1}_core_alignment_to_original.pkl')
-        output_file = map_sites_original_to_core_path % strain1
+                
+        output_file = map_sites_core_to_original_path % strain1
         with open(output_file, 'wb') as f:
             pickle.dump(core_alignment_to_original_alignment, f)
 
@@ -1856,24 +1816,23 @@ def build_allele_counts_map(votu):
     fasta_all_genomes = classFASTA(fasta_file_path).readFASTA()
     fasta_genome_dict = {x[0]:x[1] for x in fasta_all_genomes}
     
-        
     sys.stderr.write("Loading fourfold site map....\n")
     fourfold_dict = pickle.load(open(syn_sites_alignment_dict_path % votu, "rb"))
     
     # Genomes present in both annotation file and the aligned fasta
     genomes_to_examine = list(set(fasta_genome_dict.keys()) & set(fourfold_dict.keys()))
-    #genomes_to_examine = genomes_to_examine[:3]
     
     # site maps
     sys.stderr.write("Loading aligned-to-unaligned site map....\n")
     map_sites_core_to_original_all = {}
     for g in genomes_to_examine:
         
-        map_sites_original_to_core_g_path = map_sites_original_to_core_path % g
-        map_sites_original_to_core_g = pickle.load(open(map_sites_original_to_core_g_path, "rb"))
+        #map_sites_core_to_original_g = pickle.load(open(map_sites_core_to_original_path % g, "rb"))
         # reverse dictionary so that value becomes key and vice-versa
-        map_sites_original_to_core_g_rev = {v: k for k, v in map_sites_original_to_core_g.items()}
-        map_sites_core_to_original_all[g] = map_sites_original_to_core_g_rev
+        #map_sites_original_to_core_g_rev = {v: k for k, v in map_sites_original_to_core_g.items()}
+        map_sites_core_to_original_all[g] = pickle.load(open(map_sites_core_to_original_path % g, "rb"))
+        
+        #print(min(map_sites_core_to_original_all[g].keys()), max(map_sites_core_to_original_all[g].keys()))
     
     
 
@@ -1885,11 +1844,10 @@ def build_allele_counts_map(votu):
     allele_counts_map = {}
     allele_counts_map['genomes'] = fasta_genomes
     allele_counts_map['aligned_sites'] = {}
-    
+        
     for s_idx in range(len(fasta_seqs_align)):
         
         alleles_s = fasta_seqs_align[s_idx]
-        #allele_s.replace('-',)
         site_g_aligned = s_idx+1
         
         fourfold_site = []
@@ -1913,7 +1871,8 @@ def build_allele_counts_map(votu):
                     
             
             fourfold_site.append(fourfold_g_site)      
-            
+        
+        print(fourfold_site)
         
         # site_g_aligned position starts counting at ONE 
         # because the aligned (pangraph) and unaligned (annotation) data starts counting at one
@@ -1923,11 +1882,14 @@ def build_allele_counts_map(votu):
         #allele_counts_map['aligned_sites'][site_g_aligned]['unaligned_position'] = fourfold_site
             
     
-    
+    sys.stderr.write("Saving dictionary...\n")
     allele_counts_map_path_ = allele_counts_map_path % votu
     with open(allele_counts_map_path_, 'wb') as f:
         pickle.dump(allele_counts_map, f)
-
+    sys.stderr.write("Done!\n")
+        
+        
+        
 
     
     
@@ -1963,23 +1925,31 @@ def filter_allele_counts_map(allele_counts_map, max_fraction_nan=0, min_sample_s
             alleles_s = allele_counts_map['aligned_sites'][s]['alleles']
             fraction_nan = alleles_s.count('-')/n_genomes
             
-            # insufficient number of informative sites
-            if fraction_nan > max_fraction_nan:
+            # insufficient number of informative sites, or
+            # no nucleotides in any genome, uninformative
+            if (fraction_nan > max_fraction_nan) or (fraction_nan == 1.0):
                 continue 
         
             allele_count_dict = dict(Counter(alleles_s))
-            # ignore sites with > 2 alleles        
-            # we do not care about invariant sites 
             nucleotide_intersect = set(allele_count_dict.keys()) & set(nucleotides)
-            if len(nucleotide_intersect) != 2:
-                continue
+            
+            # no nucleotides in any genome, uninformative
+            #if len(nucleotide_intersect) == 0:
+            #    continue
+            
+            # If True, we do not care about invariant sites 
+            if only_biallelic == True:
+            
+                if len(nucleotide_intersect) != 2:
+                    continue
                     
-            # define major allele
+            # define major allele            
             major_allele = max(list(nucleotide_intersect), key=lambda k: allele_count_dict[k])
         
             allele_counts_map_new['aligned_sites'][s] = {}
             #major_allele = list(nucleotide_intersect - set(minor_allele))[0]
             allele_counts_map_new['aligned_sites'][s]['major_allele'] = major_allele
+            allele_counts_map_new['aligned_sites'][s]['alleles'] = alleles_s
             #allele_counts_map_new['aligned_sites'][s]['n_alleles'] = len(nucleotide_intersect)
             allele_counts_map_new['aligned_sites'][s]['n_obs_no_nan'] = sum(allele_count_dict.values())
             
@@ -2005,27 +1975,29 @@ def filter_allele_counts_map(allele_counts_map, max_fraction_nan=0, min_sample_s
 if __name__ == "__main__":
 
     votu = 'vOTU-000010'
-    #build_allele_counts_map(votu)
-
-    #build_aligned_fasta_to_unaligned_fasta_position_dict(votu)
-                
-    # make_syn_sites_votu_dict_from_alignment(votu)
     
+    build_allele_counts_map(votu)
     
     votu_all = get_single_votus()
-    target_idx = votu_all.index('vOTU-000405')
-    
-    print(target_idx)
-    for votu in votu_all[:target_idx+1]:
+
+    for votu in votu_all:
         
-        if votu in votu_to_skip:
-            continue
-            
+        continue
+        
+        print(votu)
+        
         #map_sites_original_to_core(votu)
         #make_syn_sites_votu_dict_from_alignment(votu)
         build_allele_counts_map(votu)
     
-    #    #make_syn_sites_votu_dict_from_alignment(votu)
+    
+    
+        
+    
+    
+            
+        
+    
     
     
     

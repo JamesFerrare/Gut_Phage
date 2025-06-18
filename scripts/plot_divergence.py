@@ -164,7 +164,7 @@ def calculate_divergence_pangraph(votu, n_pairs=None):#, n_genomes_subsample=6):
 
 
 
-def calculate_divergence_alignment(votu, max_fraction_nan=0, min_sample_size=1, n_pairs=None):#, n_genomes_subsample=6):
+def calculate_divergence_alignment(votu, max_fraction_nan=1, min_sample_size=1, n_pairs=None):#, n_genomes_subsample=6):
     
     allele_counts_map = pickle.load(open(data_utils.allele_counts_map_path % votu, "rb"))
     allele_counts_map_filtered = data_utils.filter_allele_counts_map(allele_counts_map,  max_fraction_nan=max_fraction_nan, min_sample_size=min_sample_size, only_biallelic=False)
@@ -185,7 +185,8 @@ def calculate_divergence_alignment(votu, max_fraction_nan=0, min_sample_size=1, 
         genome_dict[g]['fourfold_status'] = []
         genome_dict[g]['no_nan_bool_idx'] = []
         genome_dict[g]['allele_bool_idx'] = []
-        
+        genome_dict[g]['alleles'] = []
+
 
     sites_final = list(allele_counts_map_filtered['aligned_sites'].keys())
     sites_final.sort()
@@ -197,24 +198,28 @@ def calculate_divergence_alignment(votu, max_fraction_nan=0, min_sample_size=1, 
             genome_g = genomes[g_idx]
             
             #genome_dict[genome_g]['major_allele'].append( allele_counts_map_filtered['aligned_sites'][s]['major_allele'][g_idx] )
-            genome_dict[genome_g]['fourfold_status'].append( allele_counts_map_filtered['aligned_sites'][s]['fourfold_status'][g_idx] )
-            genome_dict[genome_g]['no_nan_bool_idx'].append( allele_counts_map_filtered['aligned_sites'][s]['no_nan_bool_idx'][g_idx] )
-            genome_dict[genome_g]['allele_bool_idx'].append( allele_counts_map_filtered['aligned_sites'][s]['allele_bool_idx'][g_idx] )
-            
+            genome_dict[genome_g]['fourfold_status'].append( allele_counts_map_filtered['aligned_sites'][s]['fourfold_status'][g_idx])
+            genome_dict[genome_g]['no_nan_bool_idx'].append( allele_counts_map_filtered['aligned_sites'][s]['no_nan_bool_idx'][g_idx])
+            genome_dict[genome_g]['allele_bool_idx'].append( allele_counts_map_filtered['aligned_sites'][s]['allele_bool_idx'][g_idx])
+            genome_dict[genome_g]['alleles'].append( allele_counts_map_filtered['aligned_sites'][s]['alleles'][g_idx])
+
             #if allele_counts_map_filtered['aligned_sites'][s]['fourfold_status'][g_idx] != None:
             #    print(allele_counts_map_filtered['aligned_sites'][s]['fourfold_status'][g_idx])
-
+        
             
     # make numpy arrays
     for genome in genomes:
         
-        for k in ['fourfold_status', 'no_nan_bool_idx', 'allele_bool_idx']:
+        for k in ['fourfold_status', 'no_nan_bool_idx', 'allele_bool_idx', 'alleles']:
             k_list = genome_dict[genome][k]
             genome_dict[genome][k] = numpy.asarray(k_list)
 
             
     # calculate divergence....
     genome_pair_all = list(combinations(genomes,2))   
+    
+    #genome_pair_all = random.sample(genome_pair_all, 50000)
+    
     div_dict = {}
     for genome_pair_idx, genome_pair in enumerate(genome_pair_all):
         
@@ -231,20 +236,23 @@ def calculate_divergence_alignment(votu, max_fraction_nan=0, min_sample_size=1, 
         allele_bool_idx_i = genome_dict[genome_pair[0]]['allele_bool_idx']
         allele_bool_idx_j = genome_dict[genome_pair[1]]['allele_bool_idx']
         
+        alleles_i = genome_dict[genome_pair[0]]['alleles']
+        alleles_j = genome_dict[genome_pair[1]]['alleles']
+                
         #print(fourfold_status_i[fourfold_status_i!=None])
         #print(numpy.unique(fourfold_status_i))
-        
-        to_keep_idx = no_nan_bool_idx_i*no_nan_bool_idx_j
-        n_div_total = sum(allele_bool_idx_i[to_keep_idx] != allele_bool_idx_j[to_keep_idx])
-        n_sites_total = sum(to_keep_idx)
                 
+        to_keep_idx = no_nan_bool_idx_i*no_nan_bool_idx_j
+        n_div_total = sum(alleles_i[to_keep_idx] != alleles_j[to_keep_idx])
+        n_sites_total = sum(to_keep_idx)
+                                
         #for v in variant_types:
         to_keep_syn_idx = to_keep_idx*(fourfold_status_i==3)*(fourfold_status_j==3)
-        n_div_syn = sum(allele_bool_idx_i[to_keep_syn_idx] != allele_bool_idx_j[to_keep_syn_idx])
+        n_div_syn = sum(alleles_i[to_keep_syn_idx] != alleles_j[to_keep_syn_idx])
         n_sites_syn = sum(to_keep_syn_idx) 
-        
+                
         to_keep_nonsyn_idx = to_keep_idx*(fourfold_status_i==0)*(fourfold_status_j==0)
-        n_div_nonsyn = sum(allele_bool_idx_i[to_keep_nonsyn_idx] != allele_bool_idx_j[to_keep_nonsyn_idx])
+        n_div_nonsyn = sum(alleles_i[to_keep_nonsyn_idx] != alleles_j[to_keep_nonsyn_idx])
         n_sites_nonsyn = sum(to_keep_nonsyn_idx)
     
         div_dict[genome_pair] = {}
@@ -261,7 +269,6 @@ def calculate_divergence_alignment(votu, max_fraction_nan=0, min_sample_size=1, 
         div_dict[genome_pair][3]['n_sites'] = n_sites_nonsyn
 
 
-    
     
     sys.stderr.write("Saving dictionary...\n")
     with open(div_dict_alignment_path_template % votu, 'wb') as handle:
@@ -685,12 +692,97 @@ def calculate_syn_div_and_nonsyn_ratio(votu, min_n_muts=50, min_n_sites=1e3, che
         
         return cumulative_n_syn_all, cumulative_n_nonsyn_all, cumulative_block_len_syn_all, cumulative_block_len_nonsyn_all
         
+        
+
+
+def calculate_syn_div_and_nonsyn_ratio_alignment(votu, min_n_muts=20, min_n_sites=100, check_metadata=True):
+    
+    div_dict_path = '%sdivergence_dict_alignment_all/%s.pickle' % (config.data_directory, votu)
+    # check if file exists
+    if os.path.exists(div_dict_path) == False:
+        sys.stderr.write("Divergence file does not exist for %s\n" % votu)
+        return [],[],[],[]
+        
+    else:
+        div_dict = pickle.load(open(div_dict_path, "rb"))
+        sys.stderr.write("Calculating dS and dN for %s....\n" % votu)
+        
+        cumulative_n_syn_all = []
+        cumulative_n_nonsyn_all = []
+        cumulative_block_len_syn_all = []
+        cumulative_block_len_nonsyn_all = []
+        genome_pairs_clean_all = []
+
+        for genome_pair, genome_pair_dict in div_dict.items():
+            
+            cumulative_n_syn = genome_pair_dict[3]['n_div']
+            cumulative_n_nonsyn = genome_pair_dict[0]['n_div']
+
+            cumulative_block_len_syn = genome_pair_dict[3]['n_sites']
+            cumulative_block_len_nonsyn = genome_pair_dict[0]['n_sites']
+            
+            
+            if (cumulative_n_syn == None) or (cumulative_n_nonsyn == None) or (cumulative_block_len_syn == None) or (cumulative_block_len_nonsyn == None):
+                continue
+            
+            # at least one mutation in each 
+            if (cumulative_n_syn == 0) or (cumulative_n_nonsyn == 0):
+                continue
+            
+            # total of five mutations
+            if (cumulative_n_syn + cumulative_n_nonsyn) <= min_n_muts:
+                continue
+
+            # at least min_n_sites possible sites
+            if (cumulative_block_len_syn < min_n_sites) or (cumulative_block_len_nonsyn < min_n_sites):
+                continue
+
+            
+            # check if both genomes are in annotation dictionary\
+            if check_metadata == True:
+                if (genome_pair[0] not in vgenome_dict):
+                    continue
+                else:
+                    if vgenome_dict[genome_pair[0]]['original_id'] not in sample_metagenome_dict:
+                        continue
+            
+            # make sure we have metadata
+            if check_metadata == True:
+                if (genome_pair[1] not in vgenome_dict):
+                    continue
+                else:
+                    if vgenome_dict[genome_pair[1]]['original_id'] not in sample_metagenome_dict:
+                        continue       
+                    
+            
+            cumulative_n_syn_all.append(cumulative_n_syn)
+            cumulative_n_nonsyn_all.append(cumulative_n_nonsyn)
+            cumulative_block_len_syn_all.append(cumulative_block_len_syn)
+            cumulative_block_len_nonsyn_all.append(cumulative_block_len_nonsyn)
+            genome_pairs_clean_all.append(genome_pair)
+
+
+        cumulative_n_syn_all = numpy.asarray(cumulative_n_syn_all)
+        cumulative_n_nonsyn_all = numpy.asarray(cumulative_n_nonsyn_all)
+        cumulative_block_len_syn_all = numpy.asarray(cumulative_block_len_syn_all)
+        cumulative_block_len_nonsyn_all = numpy.asarray(cumulative_block_len_nonsyn_all)
+    
+        genome_pairs_clean_all = numpy.asarray(genome_pairs_clean_all)
+
+        return cumulative_n_syn_all, cumulative_n_nonsyn_all, cumulative_block_len_syn_all, cumulative_block_len_nonsyn_all, genome_pairs_clean_all
+       
 
 
 
 def plot_ds_vs_dnds_dist_axis(votu, pseudocount=0, min_n_muts=50, min_n_sites=1e3, min_n_pairs=500, n_bins=30, poisson_thinning=True, check_metadata=True):
 
-    cumulative_n_syn_all, cumulative_n_nonsyn_all, cumulative_block_len_syn_all, cumulative_block_len_nonsyn_all = calculate_syn_div_and_nonsyn_ratio(votu, min_n_muts=min_n_muts, min_n_sites=min_n_sites, check_metadata=check_metadata)
+    # min_n_muts=50
+    # min_n_sites=1e3
+    # min_n_pairs=500
+
+    #cumulative_n_syn_all, cumulative_n_nonsyn_all, cumulative_block_len_syn_all, cumulative_block_len_nonsyn_all = calculate_syn_div_and_nonsyn_ratio(votu, min_n_muts=min_n_muts, min_n_sites=min_n_sites, check_metadata=check_metadata)
+    cumulative_n_syn_all, cumulative_n_nonsyn_all, cumulative_block_len_syn_all, cumulative_block_len_nonsyn_all, genome_pairs_clean_all = calculate_syn_div_and_nonsyn_ratio_alignment(votu, min_n_muts=min_n_muts, min_n_sites=min_n_sites, check_metadata=check_metadata)
+
 
     # only make plot if sufficient # data points (genome pairs)    
     if len(cumulative_n_syn_all) < min_n_pairs:
@@ -817,7 +909,7 @@ def plot_ds_vs_dnds_dist_axis(votu, pseudocount=0, min_n_muts=50, min_n_sites=1e
         ds_hist_axis.set_yticks([])
 
         scatter_axis.legend(loc='upper left',frameon=True, fontsize=6)
-        fig_name = "%sds_vs_dnds_dist_axis/%s.png" % (config.analysis_directory, votu)
+        fig_name = "%sds_vs_dnds_dist_axis_alignment/%s.png" % (config.analysis_directory, votu)
         fig.savefig(fig_name, bbox_inches='tight', format='png', pad_inches = 0.3, dpi = 600)
         plt.close()
         
@@ -1490,25 +1582,36 @@ if __name__ == "__main__":
     #start_idx = votu_all.index('vOTU-000005') + 1 
     #votu_all = votu_all[start_idx:]
     
-    votu = 'vOTU-000010'
-    calculate_divergence_alignment(votu)
+    #votu = 'vOTU-000010'
+    #cumulative_n_syn_all, cumulative_n_nonsyn_all, cumulative_block_len_syn_all, cumulative_block_len_nonsyn_all = calculate_syn_div_and_nonsyn_ratio_alignment(votu)
+    
+    #calculate_divergence_alignment(votu)
+    
+    for votu in votu_all:
+        
+        calculate_divergence_alignment(votu)
+    
+    #plot_ds_vs_dnds_dist_axis(votu, min_n_pairs=10, min_n_muts=10, min_n_sites=100)
+    #print((cumulative_n_nonsyn_all/cumulative_block_len_nonsyn_all) / (cumulative_n_syn_all/cumulative_block_len_syn_all)) 
+    #for votu in votu_all:
+        
+    #    if votu in data_utils.votu_to_skip:
+    #        continue
+
+    #    calculate_divergence_alignment(votu)
+    
+    
     
     #syn_div_nonsyn_ratio_dip_test()
     
     #plot_divergence_with_temperate_score(rescaled_log=False)
 
-    #for votu in votu_all:
-    #    plot_ds_vs_dnds_dist_axis(votu, poisson_thinning=True, min_n_muts=50, min_n_sites=1e3)
 
-
-    #    if votu in data_utils.votu_to_skip:
-    #        continue
 
         #data_utils.build_votu_fasta(votu, build_votu_fasta=True)
-        #data_utils.make_syn_sites_votu_dict_from_pangraph(votu)
         #calculate_divergence_pangraph(votu)
         
-        #calculate_divergence(votu)
+
         
 
 
@@ -1522,8 +1625,6 @@ if __name__ == "__main__":
     #plot_divergence_with_temperate_score(rescaled_log=True)
 
     #plot_divergence_vs_shared_blocks('vOTU-000002', min_n_muts=50, min_n_sites=1e3)
-
-    #plot_divergence_along_genome('vOTU-000002', '1', '2')
 
     #plot_dnds_vs_shared_blocks(votu, min_n_muts=50, min_n_sites=1e3)
    
