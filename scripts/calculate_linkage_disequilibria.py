@@ -31,8 +31,11 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
     allele_counts_map_filtered = data_utils.filter_allele_counts_map(allele_counts_map,  max_fraction_nan=max_fraction_nan, min_sample_size=min_sample_size, only_biallelic=True)
 
     # get sites with not too many NaNs
-    sites_final = list(allele_counts_map_filtered.keys())
-    sites_final.sorted()
+    sites_final = list(allele_counts_map_filtered['aligned_sites'].keys())
+    sites_final.sort()
+    
+    
+    sys.stderr.write("Calculating LD for %s...\n" % votu)
     
     
     ld_count_dict = {}
@@ -64,7 +67,7 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
             
             #site_pair = (s_1, s_2)
             
-            dist_12 = int(abs(s_1-s_2))
+            dist_12 = int(abs(s_1 - s_2))
             
             if dist_12 >= max_d:
                 continue
@@ -118,7 +121,7 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
         
             fourfold_status_1 = allele_counts_map_filtered['aligned_sites'][s_1]['fourfold_status']
             fourfold_status_2 = allele_counts_map_filtered['aligned_sites'][s_2]['fourfold_status']
-            
+                        
             for variant_type in data_utils.variant_types:
                 # check whether both sites have trhe same fourfold status in each genome
                 variant_type_idx = (fourfold_status_1 == variant_type) & (fourfold_status_2 == variant_type)
@@ -170,10 +173,12 @@ def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
             n_pairs_processed += 1  
            
 
-    
+    sys.stderr.write("Saving dictionary....\n")
     ld_counts_dict_path_ = ld_counts_dict_path % votu
     with open(ld_counts_dict_path_, 'wb') as f:
         pickle.dump(ld_count_dict, f)
+    sys.stderr.write("Done!\n")
+
 
     
 
@@ -191,9 +196,6 @@ if __name__ == "__main__":
     
     for votu in votu_all:
 
-        if votu in data_utils.votu_to_skip:
-            continue
-    
         build_ld_counts_dict(votu, max_fraction_nan=0.0)
     
     
