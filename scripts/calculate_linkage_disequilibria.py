@@ -27,17 +27,21 @@ min_ld_sample_size = config.between_host_ld_min_sample_size
 
 def build_ld_counts_dict(votu, max_fraction_nan=0.05, max_d=1e3):
     
+    sys.stderr.write("Loading allele counts for %s...\n" % votu)
     allele_counts_map = pickle.load(open(data_utils.allele_counts_map_path % votu, "rb"))
+    sys.stderr.write("Filtering allele counts...\n")
     allele_counts_map_filtered = data_utils.filter_allele_counts_map(allele_counts_map,  max_fraction_nan=max_fraction_nan, min_sample_size=min_sample_size, only_biallelic=True)
     
-    if len(allele_counts_map_filtered) > 0:
-
+    if len(allele_counts_map_filtered) == 0:
+        sys.stderr.write("Insufficient # sites! Skipping...\n")
+    
+    else:
         # get sites with not too many NaNs
         sites_final = list(allele_counts_map_filtered['aligned_sites'].keys())
         sites_final.sort()
         
         
-        sys.stderr.write("Calculating LD for %s...\n" % votu)
+        sys.stderr.write("Calculating LD for...\n")
         
         
         ld_count_dict = {}

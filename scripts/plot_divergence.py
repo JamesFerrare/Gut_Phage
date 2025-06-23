@@ -1581,13 +1581,15 @@ if __name__ == "__main__":
     #start_idx = votu_all.index('vOTU-000005') + 1 
     #votu_all = votu_all[start_idx:]
     
-    votu = 'vOTU-000010'
+    #votu = 'vOTU-000010'
     #cumulative_n_syn_all, cumulative_n_nonsyn_all, cumulative_block_len_syn_all, cumulative_block_len_nonsyn_all = calculate_syn_div_and_nonsyn_ratio_alignment(votu)
     
     #calculate_divergence_alignment(votu)
-    plot_ds_vs_dnds_dist_axis(votu)
+    #plot_ds_vs_dnds_dist_axis(votu)
     
-    #for votu in votu_all:
+    for votu in votu_all:
+        
+        plot_ds_vs_dnds_dist_axis(votu)
         
     #    calculate_divergence_alignment(votu)
     
