@@ -7,6 +7,9 @@ import matplotlib as mpl
 
 lifestyle_color_dict = {'both':'k', 'temperate':'#87CEEB', 'lytic':'#FF6347'}
 
+fourfold_color_dict = {0:'#FF6347', 3:'#87CEEB', 'all': 'k'}
+fourfold_label_dict = {0:'1D', 3:'4D', 'all': 'All'}
+
 
 
 def rand_jitter(arr):

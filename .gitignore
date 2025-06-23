@@ -12,3 +12,12 @@ data/uhgv_mgv.fna.gz
 data/uhgv_mgv_otu_fna/
 data/annotation_dict.pickle
 data/divergence_dict_all.zip
+data/allele_counts_map_all/
+data/ld_counts_dict_all/
+data/syn_sites_alignment_dict_all/
+data/syn_sites_pangraph_dict_all/
+data/divergence_dict_alignment_all/
+analysis/ds_vs_dnds_dist_axis_alignment/
+data/allele_counts_map_all.zip
+data/ld_counts_dict_all.zip
+data/divergence_dict_alignment_all.zip

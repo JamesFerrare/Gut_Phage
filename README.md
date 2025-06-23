@@ -3,6 +3,16 @@ Gut Phage are fun
 
 
 
+### Notes
+
+We are getting different dN/dS results when it is calculated from alignment files. I have gone through the code and the difference is that for a given pair of genomes:
+
+1) In the alignment analysis we examine all sites in the aligned file (core) that have an allele in both genomes 
+
+2) In the pangraph ananysis we examine all 
+
+ for a given pair of genomes where 
+
 
 
 ### Conda environment
@@ -54,3 +64,4 @@ Python 3.12 environment detailed in environment.yml file. Pypangraph installed v
 ├── environment.yml
 └── .gitignore
 ```
+
